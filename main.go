@@ -307,8 +307,15 @@ func main() {
 	showDocker := false // Toggle between GPU and Docker panel
 	viewMode := ViewModeNormal // Current view mode (Normal, GPU, Docker)
 
-	// Cache for GPU processes
+	// Cache for GPU processes and info
 	var cachedGPUProcesses []GPUProcess
+	var cachedGPUInfoText string
+	var cachedDockerInfoText string
+	var cachedDockerContainers []DockerContainer
+	var lastGPUUpdate time.Time
+	var lastDockerUpdate time.Time
+	var lastGPUProcessUpdate time.Time
+	var lastDockerContainerUpdate time.Time
 
 	// Function to update grid layout based on showDocker toggle
 	updateGridLayout := func() {
@@ -384,15 +391,23 @@ func main() {
 		// Update Disk Info
 		diskInfo.Text = getDiskInfo()
 
-		// Update GPU/Docker Info based on toggle
+		// Update GPU/Docker Info based on toggle (with caching - update every 2 seconds)
+		now := time.Now()
 		if showDocker {
-			dockerInfo.Text = FormatDockerInfo()
+			if now.Sub(lastDockerUpdate) > 2*time.Second || cachedDockerInfoText == "" {
+				cachedDockerInfoText = FormatDockerInfo()
+				lastDockerUpdate = now
+			}
+			dockerInfo.Text = cachedDockerInfoText
 		} else {
-			gpuInfo.Text = FormatGPUInfo()
+			if now.Sub(lastGPUUpdate) > 2*time.Second || cachedGPUInfoText == "" {
+				cachedGPUInfoText = FormatGPUInfo()
+				lastGPUUpdate = now
+			}
+			gpuInfo.Text = cachedGPUInfoText
 		}
 
 		// Update Process Table (with caching)
-		now := time.Now()
 		if now.Sub(lastProcessUpdate) > 500*time.Millisecond || cachedProcesses == nil {
 			cachedProcesses = getProcesses()
 			lastProcessUpdate = now
@@ -500,12 +515,12 @@ func main() {
 		// Render rows based on view mode
 		switch viewMode {
 		case ViewModeGPU:
-			// GPU Process view
-			gpuProcs := cachedGPUProcesses
-			if gpuProcs == nil {
-				gpuProcs = GetGPUProcesses()
-				cachedGPUProcesses = gpuProcs
+			// GPU Process view (cache for 2 seconds)
+			if now.Sub(lastGPUProcessUpdate) > 2*time.Second || cachedGPUProcesses == nil {
+				cachedGPUProcesses = GetGPUProcesses()
+				lastGPUProcessUpdate = now
 			}
+			gpuProcs := cachedGPUProcesses
 
 			// Sort GPU processes
 			sort.Slice(gpuProcs, func(i, j int) bool {
@@ -568,8 +583,12 @@ func main() {
 			}
 
 		case ViewModeDocker:
-			// Docker Container view
-			dockerContainers := GetDockerInfo().Containers
+			// Docker Container view (cache for 2 seconds)
+			if now.Sub(lastDockerContainerUpdate) > 2*time.Second || cachedDockerContainers == nil {
+				cachedDockerContainers = GetDockerInfo().Containers
+				lastDockerContainerUpdate = now
+			}
+			dockerContainers := cachedDockerContainers
 
 			// Sort containers
 			sort.Slice(dockerContainers, func(i, j int) bool {
