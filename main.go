@@ -307,15 +307,21 @@ func main() {
 	showDocker := false // Toggle between GPU and Docker panel
 	viewMode := ViewModeNormal // Current view mode (Normal, GPU, Docker)
 
-	// Cache for GPU processes and info
+	// Cache for all slow operations (GPU, Docker, System info)
 	var cachedGPUProcesses []GPUProcess
 	var cachedGPUInfoText string
 	var cachedDockerInfoText string
 	var cachedDockerContainers []DockerContainer
+	var cachedSysInfoText string
+	var cachedNetInfoText string
+	var cachedDiskInfoText string
 	var lastGPUUpdate time.Time
 	var lastDockerUpdate time.Time
 	var lastGPUProcessUpdate time.Time
 	var lastDockerContainerUpdate time.Time
+	var lastSysInfoUpdate time.Time
+	var lastNetInfoUpdate time.Time
+	var lastDiskInfoUpdate time.Time
 
 	// Function to update grid layout based on showDocker toggle
 	updateGridLayout := func() {
@@ -348,51 +354,76 @@ func main() {
 	var cachedProcesses []Process
 	var lastProcessUpdate time.Time
 
+	// Cache for CPU/Memory/Swap (updated every 500ms with process list)
+	var cachedCPUPercent float64
+	var cachedCorePercents []float64
+	var cachedMemTotal, cachedMemUsed uint64
+	var cachedMemPercent float64
+	var cachedSwapTotal, cachedSwapUsed uint64
+	var cachedSwapPercent float64
+	var lastCPUMemUpdate time.Time
+
 	render := func() {
+		now := time.Now()
+
+		// Update CPU/Memory/Swap (with caching - update every 500ms)
+		if now.Sub(lastCPUMemUpdate) > 500*time.Millisecond {
+			cachedCPUPercent = getCPUPercent()
+			cachedCorePercents = getPerCoreCPU()
+			cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
+			cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
+			lastCPUMemUpdate = now
+		}
+
 		// Update Total CPU
-		cpuPercent := getCPUPercent()
-		cpuGauge.Percent = int(cpuPercent)
-		cpuGauge.Label = fmt.Sprintf("%.1f%%", cpuPercent)
+		cpuGauge.Percent = int(cachedCPUPercent)
+		cpuGauge.Label = fmt.Sprintf("%.1f%%", cachedCPUPercent)
 
 		// Update Per-core CPU
-		corePercents := getPerCoreCPU()
-		cpuCores.Data = corePercents
+		cpuCores.Data = cachedCorePercents
 		// Update labels if core count changed
-		if len(corePercents) != len(cpuCores.Labels) {
-			labels := make([]string, len(corePercents))
-			for i := range corePercents {
+		if len(cachedCorePercents) != len(cpuCores.Labels) {
+			labels := make([]string, len(cachedCorePercents))
+			for i := range cachedCorePercents {
 				labels[i] = fmt.Sprintf("%d", i)
 			}
 			cpuCores.Labels = labels
 		}
 
 		// Update Memory
-		memTotal, memUsed, memPercent := getMemoryInfo()
-		memGauge.Percent = int(memPercent)
+		memGauge.Percent = int(cachedMemPercent)
 		memGauge.Label = fmt.Sprintf("%s / %s (%.1f%%)",
-			formatBytes(memUsed), formatBytes(memTotal), memPercent)
+			formatBytes(cachedMemUsed), formatBytes(cachedMemTotal), cachedMemPercent)
 
 		// Update Swap
-		swapTotal, swapUsed, swapPercent := getSwapInfo()
-		swapGauge.Percent = int(swapPercent)
-		if swapTotal > 0 {
+		swapGauge.Percent = int(cachedSwapPercent)
+		if cachedSwapTotal > 0 {
 			swapGauge.Label = fmt.Sprintf("%s / %s (%.1f%%)",
-				formatBytes(swapUsed), formatBytes(swapTotal), swapPercent)
+				formatBytes(cachedSwapUsed), formatBytes(cachedSwapTotal), cachedSwapPercent)
 		} else {
 			swapGauge.Label = "No Swap"
 		}
 
-		// Update System Info
-		sysInfo.Text = getSystemInfo()
+		// Update System/Network/Disk Info (with caching - update every 1 second)
+		if now.Sub(lastSysInfoUpdate) > 1*time.Second || cachedSysInfoText == "" {
+			cachedSysInfoText = getSystemInfo()
+			lastSysInfoUpdate = now
+		}
+		sysInfo.Text = cachedSysInfoText
 
-		// Update Network Info
-		netInfo.Text = getNetworkInfo()
+		if now.Sub(lastNetInfoUpdate) > 1*time.Second || cachedNetInfoText == "" {
+			cachedNetInfoText = getNetworkInfo()
+			lastNetInfoUpdate = now
+		}
+		netInfo.Text = cachedNetInfoText
 
-		// Update Disk Info
-		diskInfo.Text = getDiskInfo()
+		if now.Sub(lastDiskInfoUpdate) > 1*time.Second || cachedDiskInfoText == "" {
+			cachedDiskInfoText = getDiskInfo()
+			lastDiskInfoUpdate = now
+		}
+		diskInfo.Text = cachedDiskInfoText
 
 		// Update GPU/Docker Info based on toggle (with caching - update every 2 seconds)
-		now := time.Now()
 		if showDocker {
 			if now.Sub(lastDockerUpdate) > 2*time.Second || cachedDockerInfoText == "" {
 				cachedDockerInfoText = FormatDockerInfo()
