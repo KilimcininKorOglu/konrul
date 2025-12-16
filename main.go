@@ -354,17 +354,18 @@ func main() {
 	var cachedSwapTotal, cachedSwapUsed uint64
 	var cachedSwapPercent float64
 
-	// Initialize all caches immediately at startup
+	// Initialize fast caches at startup (slow ones loaded by first ticker)
 	cachedCPUPercent = getCPUPercent()
 	cachedCorePercents = getPerCoreCPU()
 	cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
 	cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
-	cachedSysInfoText = getSystemInfo()
-	cachedNetInfoText = getNetworkInfo()
-	cachedDiskInfoText = getDiskInfo()
-	cachedGPUInfoText = FormatGPUInfo()
-	cachedDockerInfoText = FormatDockerInfo()
-	cachedProcesses = getProcesses()
+	// Set placeholder text for slow data (will be updated by ticker)
+	cachedSysInfoText = "Loading..."
+	cachedNetInfoText = "Loading..."
+	cachedDiskInfoText = "Loading..."
+	cachedGPUInfoText = "Loading..."
+	cachedDockerInfoText = "Loading..."
+	// Process list will be empty until first ticker
 
 	// collectData gathers all system data (called only by ticker)
 	collectData := func() {
@@ -771,6 +772,12 @@ func main() {
 	}
 
 	render()
+
+	// Start background data collection immediately
+	go func() {
+		collectData()
+		render()
+	}()
 
 	uiEvents := ui.PollEvents()
 	ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
