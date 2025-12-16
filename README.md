@@ -11,6 +11,8 @@ this lightweight htop-like system monitor is written in Go.
 - Memory and swap usage display
 - Network I/O monitoring (RX/TX with per-second rates)
 - Disk I/O and usage monitoring
+- GPU monitoring (NVIDIA via nvidia-smi)
+- Docker container monitoring
 - Process list with multiple sorting options (CPU, MEM, PID, NAME)
 - Process management (kill selected process)
 - Responsive terminal UI
@@ -25,6 +27,8 @@ this lightweight htop-like system monitor is written in Go.
 | Windows Support  | ✅ Native support               | ❌ Not available            |
 | Network I/O      | ✅ Built-in panel               | ❌ Not available            |
 | Disk I/O         | ✅ Built-in panel               | ❌ Not available            |
+| GPU Monitoring   | ✅ NVIDIA (nvidia-smi)          | ❌ Not available            |
+| Docker Monitor   | ✅ Container stats              | ❌ Not available            |
 | Single Binary    | ✅ Zero dependencies            | ❌ Requires ncurses         |
 | Cross-platform   | ✅ Linux, macOS, Win, FreeBSD   | ⚠️ Linux, macOS, FreeBSD    |
 | Per-core CPU     | ✅ Bar chart                    | ✅ Bar graph                |
@@ -140,6 +144,7 @@ konrul.exe
 | r | Reverse sort order |
 | t | Toggle tree view |
 | T | Cycle themes (default, dark, light, monokai) |
+| d | Toggle GPU/Docker panel |
 | / | Search/filter processes |
 | Esc | Clear search filter |
 | ? / h | Show help screen |
@@ -268,9 +273,14 @@ go build -ldflags "-s -w \
 - [x] Configuration file support (YAML)
 - [x] Theme support (4 built-in themes)
 
-### Phase 4: Future (Planned)
-- [ ] GPU monitoring (NVIDIA/AMD)
-- [ ] Docker container monitoring
+### Phase 4: Extended Monitoring (Complete)
+- [x] GPU monitoring (NVIDIA via nvidia-smi)
+- [x] Docker container monitoring
+
+### Future Plans
+- [ ] AMD GPU monitoring (rocm-smi)
+- [ ] Kubernetes pod monitoring
+- [ ] Custom plugin system
 
 ## License
 
