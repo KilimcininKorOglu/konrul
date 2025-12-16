@@ -30,7 +30,7 @@ import (
 
 // Version information (set by ldflags during build)
 var (
-	version = "1.0.0"
+	version = "1.1.0"
 	commit  = "unknown"
 	date    = "unknown"
 )
@@ -275,8 +275,6 @@ func main() {
 	cpuCores.BarColors = theme.BarColors
 	cpuCores.NumFormatter = func(f float64) string { return "" } // Hide values, show only bars
 	cpuCores.LabelStyles = []ui.Style{ui.NewStyle(theme.LabelColor)}
-	cpuCores.BarWidth = 3
-	cpuCores.BarGap = 1
 
 	// Get initial core count
 	numCores := runtime.NumCPU()
@@ -285,6 +283,25 @@ func main() {
 		coreLabels[i] = fmt.Sprintf("%d", i)
 	}
 	cpuCores.Labels = coreLabels
+
+	// Function to calculate optimal bar width based on panel width and core count
+	updateBarWidth := func(panelWidth int) {
+		// Panel width minus borders (2) and some padding (2)
+		availableWidth := panelWidth - 4
+		if availableWidth < numCores {
+			availableWidth = numCores
+		}
+		// Calculate bar width: (availableWidth) / numCores - gap(1)
+		barWidth := (availableWidth / numCores) - 1
+		if barWidth < 1 {
+			barWidth = 1
+		}
+		if barWidth > 5 {
+			barWidth = 5 // Max bar width
+		}
+		cpuCores.BarWidth = barWidth
+		cpuCores.BarGap = 1
+	}
 
 	// Layout
 	grid := ui.NewGrid()
@@ -387,6 +404,12 @@ func main() {
 		// Update Total CPU
 		cpuGauge.Percent = int(cachedCPUPercent)
 		cpuGauge.Label = fmt.Sprintf("%.1f%%", cachedCPUPercent)
+
+		// Update terminal dimensions and bar width
+		// CPU Cores panel takes 35% of screen width (0.35 in grid layout)
+		termWidth, termHeight = ui.TerminalDimensions()
+		cpuCoresPanelWidth := int(float64(termWidth) * 0.35)
+		updateBarWidth(cpuCoresPanelWidth)
 
 		// Update Per-core CPU (round to integers for cleaner display)
 		roundedCorePercents := make([]float64, len(cachedCorePercents))
@@ -758,11 +781,11 @@ func main() {
 		// Update status bar based on view mode
 		switch viewMode {
 		case ViewModeGPU:
-			statusBar.Text = " F1:Help F8:Sort F9:Kill F10:Quit | g:GPU% G:GPU_MEM | d:Docker/Normal | GPU Processes "
+			statusBar.Text = " Konrul | F1:Help F8:Sort F9:Kill F10:Quit | g:GPU% G:GPU_MEM | d:Docker/Normal "
 		case ViewModeDocker:
-			statusBar.Text = " F1:Help F8:Sort F9:Stop F10:Quit | c:CPU m:MEM n:NAME | d:GPU/Normal | Docker Containers "
+			statusBar.Text = " Konrul | F1:Help F8:Sort F9:Stop F10:Quit | c:CPU m:MEM n:NAME | d:GPU/Normal "
 		default:
-			statusBar.Text = " F1:Help F8:Sort F9:Kill F10:Quit | /:Search t:Tree d:GPU/Docker T:Theme "
+			statusBar.Text = " Konrul | F1:Help F8:Sort F9:Kill F10:Quit | /:Search t:Tree d:GPU/Docker T:Theme "
 		}
 
 		grid.SetRect(0, 0, termWidth, termHeight)
@@ -1358,9 +1381,7 @@ func getProcesses() []Process {
 
 // renderHelp displays a help overlay with keyboard shortcuts
 func renderHelp(termWidth, termHeight int) {
-	helpText := ` Konrul - Help
-
- Function Keys:
+	helpText := ` Function Keys:
    F1         Show this help
    F8         Cycle sort mode
    F9         Kill process / Stop container
@@ -1397,18 +1418,21 @@ func renderHelp(termWidth, termHeight int) {
    ?/h        Show this help
    q/Ctrl+C   Quit
 
- Press any key to close this help`
+ Press any key to close this help
+
+ Konrul ` + version + `
+ KilimcininKorOglu`
 
 	// Create help paragraph
 	helpPara := widgets.NewParagraph()
-	helpPara.Title = " Help "
+	helpPara.Title = " Konrul Help "
 	helpPara.Text = helpText
 	helpPara.BorderStyle.Fg = ui.ColorYellow
 	helpPara.TitleStyle.Fg = ui.ColorYellow
 
 	// Calculate centered position
 	helpWidth := 50
-	helpHeight := 44
+	helpHeight := 46
 	x := (termWidth - helpWidth) / 2
 	y := (termHeight - helpHeight) / 2
 	if x < 0 {
