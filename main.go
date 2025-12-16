@@ -153,6 +153,10 @@ func main() {
 		refreshInterval = 10
 	}
 
+	// Initialize CPU metrics before starting UI (first call can be slow)
+	cpu.Percent(100*time.Millisecond, false)
+	cpu.Percent(100*time.Millisecond, true)
+
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
