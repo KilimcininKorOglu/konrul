@@ -371,18 +371,25 @@ func main() {
 	cachedSysInfoText = getSystemInfo()
 	cachedNetInfoText = getNetworkInfo()
 	cachedDiskInfoText = getDiskInfo()
+	cachedGPUInfoText = FormatGPUInfo()
+	cachedDockerInfoText = FormatDockerInfo()
 	cachedProcesses = getProcesses()
-	lastCPUMemUpdate = time.Now()
-	lastSysInfoUpdate = time.Now()
-	lastNetInfoUpdate = time.Now()
-	lastDiskInfoUpdate = time.Now()
-	lastProcessUpdate = time.Now()
+	initTime := time.Now()
+	lastCPUMemUpdate = initTime
+	lastSysInfoUpdate = initTime
+	lastNetInfoUpdate = initTime
+	lastDiskInfoUpdate = initTime
+	lastProcessUpdate = initTime
+	lastGPUUpdate = initTime
+	lastDockerUpdate = initTime
 
 	render := func() {
 		now := time.Now()
 
 		// Update CPU/Memory/Swap (with caching - update every 500ms)
-		if now.Sub(lastCPUMemUpdate) > 500*time.Millisecond {
+		// Skip data collection on keyboard events (only update on timer)
+		isTimerUpdate := now.Sub(lastCPUMemUpdate) > 500*time.Millisecond
+		if isTimerUpdate {
 			cachedCPUPercent = getCPUPercent()
 			cachedCorePercents = getPerCoreCPU()
 			cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
@@ -420,19 +427,19 @@ func main() {
 		}
 
 		// Update System/Network/Disk Info (with caching - update every 1 second)
-		if now.Sub(lastSysInfoUpdate) > 1*time.Second || cachedSysInfoText == "" {
+		if now.Sub(lastSysInfoUpdate) > 1*time.Second {
 			cachedSysInfoText = getSystemInfo()
 			lastSysInfoUpdate = now
 		}
 		sysInfo.Text = cachedSysInfoText
 
-		if now.Sub(lastNetInfoUpdate) > 1*time.Second || cachedNetInfoText == "" {
+		if now.Sub(lastNetInfoUpdate) > 1*time.Second {
 			cachedNetInfoText = getNetworkInfo()
 			lastNetInfoUpdate = now
 		}
 		netInfo.Text = cachedNetInfoText
 
-		if now.Sub(lastDiskInfoUpdate) > 1*time.Second || cachedDiskInfoText == "" {
+		if now.Sub(lastDiskInfoUpdate) > 1*time.Second {
 			cachedDiskInfoText = getDiskInfo()
 			lastDiskInfoUpdate = now
 		}
@@ -440,13 +447,13 @@ func main() {
 
 		// Update GPU/Docker Info based on toggle (with caching - update every 2 seconds)
 		if showDocker {
-			if now.Sub(lastDockerUpdate) > 2*time.Second || cachedDockerInfoText == "" {
+			if now.Sub(lastDockerUpdate) > 2*time.Second {
 				cachedDockerInfoText = FormatDockerInfo()
 				lastDockerUpdate = now
 			}
 			dockerInfo.Text = cachedDockerInfoText
 		} else {
-			if now.Sub(lastGPUUpdate) > 2*time.Second || cachedGPUInfoText == "" {
+			if now.Sub(lastGPUUpdate) > 2*time.Second {
 				cachedGPUInfoText = FormatGPUInfo()
 				lastGPUUpdate = now
 			}
@@ -454,7 +461,7 @@ func main() {
 		}
 
 		// Update Process Table (with caching)
-		if now.Sub(lastProcessUpdate) > 500*time.Millisecond || cachedProcesses == nil {
+		if now.Sub(lastProcessUpdate) > 500*time.Millisecond {
 			cachedProcesses = getProcesses()
 			lastProcessUpdate = now
 		}
