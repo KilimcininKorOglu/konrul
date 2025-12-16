@@ -814,7 +814,7 @@ func main() {
 					searchMode = false
 					searchQuery = ""
 					render()
-				case "<Backspace>":
+				case "<Backspace>", "<C-8>", "<Delete>":
 					if len(searchQuery) > 0 {
 						searchQuery = searchQuery[:len(searchQuery)-1]
 					}
