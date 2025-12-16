@@ -56,6 +56,17 @@ const (
 	SortByMem
 	SortByPID
 	SortByName
+	SortByGPUMem  // For GPU view
+	SortByGPUPerc // For GPU view
+)
+
+// ViewMode represents the current view mode
+type ViewMode int
+
+const (
+	ViewModeNormal ViewMode = iota // All processes
+	ViewModeGPU                     // GPU processes only
+	ViewModeDocker                  // Docker containers
 )
 
 func (s SortMode) String() string {
@@ -68,8 +79,23 @@ func (s SortMode) String() string {
 		return "PID"
 	case SortByName:
 		return "NAME"
+	case SortByGPUMem:
+		return "GPU_MEM"
+	case SortByGPUPerc:
+		return "GPU%"
 	default:
 		return "CPU%"
+	}
+}
+
+func (v ViewMode) String() string {
+	switch v {
+	case ViewModeGPU:
+		return "GPU"
+	case ViewModeDocker:
+		return "Docker"
+	default:
+		return "Normal"
 	}
 }
 
@@ -279,6 +305,11 @@ func main() {
 	searchQuery := ""
 	showHelp := false
 	showDocker := false // Toggle between GPU and Docker panel
+	viewMode := ViewModeNormal // Current view mode (Normal, GPU, Docker)
+
+	// Cache for GPU processes
+	var cachedGPUProcesses []GPUProcess
+	_ = cachedGPUProcesses // Will be used in render
 
 	// Function to update grid layout based on showDocker toggle
 	updateGridLayout := func() {
@@ -721,14 +752,45 @@ func main() {
 				cpuCores.LabelStyles = []ui.Style{ui.NewStyle(theme.LabelColor)}
 				render()
 			case "d":
-				// Toggle between GPU and Docker panel
+				// Toggle between GPU and Docker panel, and update view mode
 				showDocker = !showDocker
+				if showDocker {
+					viewMode = ViewModeDocker
+					// Reset sort mode to CPU for Docker view
+					if sortMode == SortByGPUMem || sortMode == SortByGPUPerc {
+						sortMode = SortByCPU
+					}
+				} else {
+					// Check if GPU is available
+					gpuInfo := GetGPUInfo()
+					if gpuInfo.Available {
+						viewMode = ViewModeGPU
+						cachedGPUProcesses = GetGPUProcesses()
+					} else {
+						viewMode = ViewModeNormal
+					}
+				}
 				updateGridLayout()
 				render()
+			case "g":
+				// Sort by GPU% (only in GPU view)
+				if viewMode == ViewModeGPU {
+					sortMode = SortByGPUPerc
+					render()
+				}
+			case "G":
+				// Sort by GPU Memory (only in GPU view)
+				if viewMode == ViewModeGPU {
+					sortMode = SortByGPUMem
+					render()
+				}
 			}
 		case <-ticker.C:
 			// Force process list refresh on each tick
 			cachedProcesses = nil
+			if viewMode == ViewModeGPU {
+				cachedGPUProcesses = GetGPUProcesses()
+			}
 			render()
 		}
 	}
