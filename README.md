@@ -7,9 +7,11 @@ this lightweight htop-like system monitor is written in Go.
 
 ## Features
 
-- Real-time CPU usage monitoring with history graph
+- Real-time CPU usage monitoring (total and per-core)
 - Memory and swap usage display
-- Process list with sorting by CPU usage
+- Network I/O monitoring (RX/TX with per-second rates)
+- Disk I/O and usage monitoring
+- Process list with multiple sorting options (CPU, MEM, PID, NAME)
 - Process management (kill selected process)
 - Responsive terminal UI
 - Cross-platform support (Linux, macOS, Windows, FreeBSD)
@@ -112,6 +114,11 @@ konrul.exe
 | K / Delete | Kill selected process |
 | Home | Jump to top of list |
 | End | Jump to bottom of list |
+| c | Sort by CPU usage |
+| m | Sort by Memory usage |
+| p | Sort by PID |
+| n | Sort by Name |
+| r | Reverse sort order |
 
 ## UI Layout
 
@@ -119,19 +126,18 @@ konrul.exe
 +-- CPU ---------------++-- Memory ------------++-- Swap --------------+
 | [========  ] 78.5%   || [=====   ] 4.2G/8G   || [        ] 0/2G      |
 +----------------------++----------------------++----------------------+
-+-- CPU History ----------------++-- System -----------------------+
-| ............................  || Hostname: server01              |
-|                               || Uptime: 5d 12h 30m              |
-+-------------------------------+| Load: 1.25 0.87 0.52            |
-                                 | Processes: 142                  |
-                                 | Platform: linux                 |
-                                 +----------------------------------+
-+-- Processes (Up/Down: scroll, q: quit, K: kill) -----------------+
-| PID     USER     CPU%    MEM%    STATE   COMMAND                 |
-| 1234    root     45.2    3.2     S       /usr/bin/python3...     |
-| 5678    www      12.1    1.8     S       nginx: worker proc...   |
-| 9012    mysql    8.5     5.1     S       /usr/sbin/mysqld        |
-+------------------------------------------------------------------+
++-- CPU Cores -------++-- Network -++-- Disk ----++-- System ---+
+| 0: [===    ] 45%   || RX: 1.2G   || Used: 65%  || Up: 5d12h   |
+| 1: [======  ] 72%  || TX: 856M   || R: 12M/s   || Load: 1.25  |
+| 2: [====    ] 55%  || RX/s: 125K || W: 8M/s    || Procs: 142  |
+| 3: [=       ] 12%  || TX/s: 45K  |+------------++-------------+
++--------------------++------------+
++-- Processes [c:CPU m:MEM p:PID n:NAME r:Rev] Sort:CPU% -------------+
+| PID     USER     CPU%    MEM%    STATE   COMMAND                    |
+| 1234    root     45.2    3.2     S       /usr/bin/python3...        |
+| 5678    www      12.1    1.8     S       nginx: worker proc...      |
+| 9012    mysql    8.5     5.1     S       /usr/sbin/mysqld           |
++---------------------------------------------------------------------+
 ```
 
 ## Technical Details
@@ -155,8 +161,10 @@ konrul.exe
 ### System Information Sources
 
 gopsutil provides cross-platform abstractions for:
-- CPU usage (cpu.Percent)
+- CPU usage (cpu.Percent) - total and per-core
 - Memory information (mem.VirtualMemory, mem.SwapMemory)
+- Network I/O (net.IOCounters) - bytes sent/received
+- Disk I/O (disk.IOCounters, disk.Usage) - read/write and usage
 - Process information (process.Pids, process.NewProcess)
 - Host information (host.Uptime)
 - Load average (load.Avg) - Linux/macOS/FreeBSD
@@ -191,23 +199,26 @@ go build -ldflags "-s -w \
 ## Roadmap
 
 ### Phase 1: MVP (Complete)
-- CPU, Memory, Swap monitoring
-- Process list with kill feature
-- Basic system information
-- Cross-platform support
+- [x] CPU, Memory, Swap monitoring
+- [x] Process list with kill feature
+- [x] Basic system information
+- [x] Cross-platform support
 
-### Phase 2: Extended Features
-- Per-core CPU usage
-- Network I/O monitoring
-- Disk I/O and usage
-- Process tree view
+### Phase 2: Extended Features (Complete)
+- [x] Per-core CPU usage display
+- [x] Network I/O monitoring (RX/TX rates)
+- [x] Disk I/O and usage monitoring
+- [x] Process sorting options (CPU/MEM/PID/NAME)
+- [ ] Process tree view
 
-### Phase 3: Advanced
-- Process filtering and search
-- Customizable layout
-- GPU monitoring (NVIDIA/AMD)
-- Docker container monitoring
-- Configuration file support
+### Phase 3: Advanced (Planned)
+- [ ] Process filtering and search
+- [ ] Configuration file support
+- [ ] Help screen (keyboard shortcuts)
+- [ ] Command-line arguments
+- [ ] Theme support
+- [ ] GPU monitoring (NVIDIA/AMD)
+- [ ] Docker container monitoring
 
 ## License
 
