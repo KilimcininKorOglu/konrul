@@ -234,8 +234,8 @@ func main() {
 	processTable.RowSeparator = false
 	processTable.BorderStyle.Fg = theme.BorderColor
 	processTable.TextAlignment = ui.AlignLeft
-	// Column widths: PID(7), USER(9), CPU%(6), MEM%(6), STATE(9), COMMAND(remaining)
-	processTable.ColumnWidths = []int{7, 9, 6, 6, 9, -1}
+	// Column widths: PID(8), USER(12), CPU%(6), MEM%(6), STATE(9), COMMAND(remaining)
+	processTable.ColumnWidths = []int{8, 12, 6, 6, 9, -1}
 
 	// System Info
 	sysInfo := widgets.NewParagraph()
@@ -876,7 +876,7 @@ func main() {
 				grid.SetRect(0, 0, payload.Width, payload.Height)
 				render()
 			case "<Down>", "j":
-				totalProcesses := len(processTable.Rows) - 1 // -1 for header
+				totalProcesses := len(cachedProcesses)
 				if selectedRow < maxVisibleRows && selectedRow < totalProcesses {
 					selectedRow++
 					updateSelection()
@@ -904,7 +904,7 @@ func main() {
 					render()
 				}
 			case "<End>":
-				totalProcesses := len(processTable.Rows) - 1
+				totalProcesses := len(cachedProcesses)
 				if totalProcesses > maxVisibleRows {
 					scrollOffset = totalProcesses - maxVisibleRows
 					selectedRow = maxVisibleRows
