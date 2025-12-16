@@ -168,8 +168,11 @@ func main() {
 		}
 
 		// Calculate visible rows based on terminal height
+		// Process table takes 73% of screen height (0.73 in grid layout)
+		// Subtract 3 for: top border (1) + header row (1) + bottom border (1)
 		termWidth, termHeight = ui.TerminalDimensions()
-		maxVisibleRows = termHeight/2 - 5
+		processTableHeight := int(float64(termHeight) * 0.73)
+		maxVisibleRows = processTableHeight - 3
 		if maxVisibleRows < 5 {
 			maxVisibleRows = 5
 		}
