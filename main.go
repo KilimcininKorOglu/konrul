@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"runtime"
 	"sort"
 	"strconv"
@@ -576,10 +575,8 @@ func getDiskInfo() string {
 	)
 }
 
-// getSystemInfo returns formatted system information
+// getSystemInfo returns formatted system information (compact version)
 func getSystemInfo() string {
-	hostname, _ := os.Hostname()
-
 	// Get uptime
 	uptimeStr := "N/A"
 	if uptime, err := host.Uptime(); err == nil {
@@ -587,9 +584,9 @@ func getSystemInfo() string {
 		hours := (uptime % 86400) / 3600
 		minutes := (uptime % 3600) / 60
 		if days > 0 {
-			uptimeStr = fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
+			uptimeStr = fmt.Sprintf("%dd%dh", days, hours)
 		} else if hours > 0 {
-			uptimeStr = fmt.Sprintf("%dh %dm", hours, minutes)
+			uptimeStr = fmt.Sprintf("%dh%dm", hours, minutes)
 		} else {
 			uptimeStr = fmt.Sprintf("%dm", minutes)
 		}
@@ -604,15 +601,9 @@ func getSystemInfo() string {
 		procCount = len(procs)
 	}
 
-	// Get CPU core count
-	numCores := runtime.NumCPU()
-
-	// Get platform info
-	platform := runtime.GOOS
-
 	return fmt.Sprintf(
-		"Hostname: %s\nUptime: %s\nLoad: %s\nCores: %d\nProcesses: %d\nPlatform: %s",
-		hostname, uptimeStr, loadStr, numCores, procCount, platform,
+		"Up: %s\nLoad: %s\nProcs: %d",
+		uptimeStr, loadStr, procCount,
 	)
 }
 
