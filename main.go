@@ -367,28 +367,35 @@ func main() {
 	cachedDockerInfoText = "Loading..."
 	// Process list will be empty until first ticker
 
-	// collectData gathers all system data (called only by ticker)
+	// collectData gathers system data based on current view mode
 	collectData := func() {
-		// Update CPU/Memory/Swap
+		// Update CPU/Memory/Swap (always needed)
 		cachedCPUPercent = getCPUPercent()
 		cachedCorePercents = getPerCoreCPU()
 		cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
 		cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
 
-		// Update System/Network/Disk Info
+		// Update System/Network/Disk Info (always needed for panels)
 		cachedSysInfoText = getSystemInfo()
 		cachedNetInfoText = getNetworkInfo()
 		cachedDiskInfoText = getDiskInfo()
 
-		// Update GPU/Docker Info
-		if showDocker {
-			cachedDockerInfoText = FormatDockerInfo()
-		} else {
+		// Update data based on current view mode only
+		switch viewMode {
+		case ViewModeNormal:
+			// Normal view: only process list needed
+			cachedProcesses = getProcesses()
+			// Update GPU panel info (for the small panel, not the list)
 			cachedGPUInfoText = FormatGPUInfo()
+		case ViewModeGPU:
+			// GPU view: only GPU processes needed
+			cachedGPUProcesses = GetGPUProcesses()
+			cachedGPUInfoText = FormatGPUInfo()
+		case ViewModeDocker:
+			// Docker view: only Docker containers needed
+			cachedDockerContainers = GetDockerInfo().Containers
+			cachedDockerInfoText = FormatDockerInfo()
 		}
-
-		// Update Process Table
-		cachedProcesses = getProcesses()
 	}
 
 	// render updates the UI from cached data (fast, called on keyboard events)
@@ -1050,13 +1057,8 @@ func main() {
 				}
 			}
 		case <-ticker.C:
-			// Collect all data in background (this is the only place data is collected!)
+			// Collect data based on current view mode
 			collectData()
-			if viewMode == ViewModeGPU {
-				cachedGPUProcesses = GetGPUProcesses()
-			} else if viewMode == ViewModeDocker {
-				cachedDockerContainers = GetDockerInfo().Containers
-			}
 			render()
 		}
 	}
