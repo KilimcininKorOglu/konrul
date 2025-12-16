@@ -179,30 +179,34 @@ func main() {
 	}
 	defer ui.Close()
 
+	// Initialize theme from config
+	SetTheme(config.Theme)
+	theme := GetCurrentTheme()
+
 	// CPU Gauge (Total)
 	cpuGauge := widgets.NewGauge()
 	cpuGauge.Title = " CPU "
-	cpuGauge.BarColor = ui.ColorGreen
-	cpuGauge.BorderStyle.Fg = ui.ColorCyan
+	cpuGauge.BarColor = theme.CPUColor
+	cpuGauge.BorderStyle.Fg = theme.BorderColor
 
 	// Memory Gauge
 	memGauge := widgets.NewGauge()
 	memGauge.Title = " Memory "
-	memGauge.BarColor = ui.ColorYellow
-	memGauge.BorderStyle.Fg = ui.ColorCyan
+	memGauge.BarColor = theme.MemoryColor
+	memGauge.BorderStyle.Fg = theme.BorderColor
 
 	// Swap Gauge
 	swapGauge := widgets.NewGauge()
 	swapGauge.Title = " Swap "
-	swapGauge.BarColor = ui.ColorMagenta
-	swapGauge.BorderStyle.Fg = ui.ColorCyan
+	swapGauge.BarColor = theme.SwapColor
+	swapGauge.BorderStyle.Fg = theme.BorderColor
 
 	// Process Table
 	processTable := widgets.NewTable()
 	processTable.Title = " Processes (Up/Down: scroll, q: quit, K: kill) "
-	processTable.TextStyle = ui.NewStyle(ui.ColorWhite)
+	processTable.TextStyle = ui.NewStyle(theme.TextColor)
 	processTable.RowSeparator = false
-	processTable.BorderStyle.Fg = ui.ColorCyan
+	processTable.BorderStyle.Fg = theme.BorderColor
 	processTable.TextAlignment = ui.AlignLeft
 	// Column widths: PID(7), USER(9), CPU%(6), MEM%(6), STATE(6), COMMAND(remaining)
 	processTable.ColumnWidths = []int{7, 9, 6, 6, 6, -1}
@@ -210,25 +214,25 @@ func main() {
 	// System Info
 	sysInfo := widgets.NewParagraph()
 	sysInfo.Title = " System "
-	sysInfo.BorderStyle.Fg = ui.ColorCyan
+	sysInfo.BorderStyle.Fg = theme.BorderColor
 
 	// Network I/O Info
 	netInfo := widgets.NewParagraph()
 	netInfo.Title = " Network "
-	netInfo.BorderStyle.Fg = ui.ColorCyan
+	netInfo.BorderStyle.Fg = theme.BorderColor
 
 	// Disk I/O Info
 	diskInfo := widgets.NewParagraph()
 	diskInfo.Title = " Disk "
-	diskInfo.BorderStyle.Fg = ui.ColorCyan
+	diskInfo.BorderStyle.Fg = theme.BorderColor
 
 	// Per-core CPU BarChart
 	cpuCores := widgets.NewBarChart()
 	cpuCores.Title = " CPU Cores "
-	cpuCores.BorderStyle.Fg = ui.ColorCyan
-	cpuCores.BarColors = []ui.Color{ui.ColorGreen, ui.ColorYellow, ui.ColorRed, ui.ColorCyan, ui.ColorMagenta, ui.ColorBlue, ui.ColorWhite}
+	cpuCores.BorderStyle.Fg = theme.BorderColor
+	cpuCores.BarColors = theme.BarColors
 	cpuCores.NumStyles = []ui.Style{ui.NewStyle(ui.ColorBlack)}
-	cpuCores.LabelStyles = []ui.Style{ui.NewStyle(ui.ColorCyan)}
+	cpuCores.LabelStyles = []ui.Style{ui.NewStyle(theme.LabelColor)}
 	cpuCores.BarWidth = 3
 	cpuCores.BarGap = 1
 
@@ -446,7 +450,7 @@ func main() {
 		}
 
 		processTable.Rows = rows
-		processTable.RowStyles[0] = ui.NewStyle(ui.ColorYellow, ui.ColorClear, ui.ModifierBold)
+		processTable.RowStyles[0] = ui.NewStyle(theme.HeaderFg, theme.HeaderBg, ui.ModifierBold)
 
 		// Adjust selectedRow if it's out of bounds
 		if selectedRow >= len(rows) {
@@ -457,7 +461,7 @@ func main() {
 		}
 
 		if selectedRow > 0 && selectedRow < len(rows) {
-			processTable.RowStyles[selectedRow] = ui.NewStyle(ui.ColorBlack, ui.ColorCyan)
+			processTable.RowStyles[selectedRow] = ui.NewStyle(theme.SelectionFg, theme.SelectionBg)
 		}
 
 		grid.SetRect(0, 0, termWidth, termHeight)
@@ -612,6 +616,26 @@ func main() {
 				render()
 			case "t":
 				treeView = !treeView
+				render()
+			case "T":
+				// Cycle through themes
+				NextTheme()
+				theme = GetCurrentTheme()
+				// Update widget colors
+				cpuGauge.BarColor = theme.CPUColor
+				cpuGauge.BorderStyle.Fg = theme.BorderColor
+				memGauge.BarColor = theme.MemoryColor
+				memGauge.BorderStyle.Fg = theme.BorderColor
+				swapGauge.BarColor = theme.SwapColor
+				swapGauge.BorderStyle.Fg = theme.BorderColor
+				processTable.TextStyle = ui.NewStyle(theme.TextColor)
+				processTable.BorderStyle.Fg = theme.BorderColor
+				sysInfo.BorderStyle.Fg = theme.BorderColor
+				netInfo.BorderStyle.Fg = theme.BorderColor
+				diskInfo.BorderStyle.Fg = theme.BorderColor
+				cpuCores.BorderStyle.Fg = theme.BorderColor
+				cpuCores.BarColors = theme.BarColors
+				cpuCores.LabelStyles = []ui.Style{ui.NewStyle(theme.LabelColor)}
 				render()
 			}
 		case <-ticker.C:
@@ -864,6 +888,7 @@ func renderHelp(termWidth, termHeight int) {
 
  Views:
    t          Toggle tree view
+   T          Cycle themes
    /          Search/filter processes
    Esc        Clear search filter
 
