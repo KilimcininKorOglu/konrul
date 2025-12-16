@@ -30,7 +30,7 @@ import (
 
 // Version information (set by ldflags during build)
 var (
-	version = "dev"
+	version = "1.0.0"
 	commit  = "unknown"
 	date    = "unknown"
 )
@@ -380,14 +380,6 @@ func main() {
 			cachedDockerInfoText = FormatDockerInfo()
 		}
 	}
-
-	// INSTANT startup - only set defaults, first ticker will load real data
-	cachedCorePercents = make([]float64, runtime.NumCPU())
-	cachedSysInfoText = "Loading..."
-	cachedNetInfoText = "Loading..."
-	cachedDiskInfoText = "Loading..."
-	cachedGPUInfoText = "Loading..."
-	cachedDockerInfoText = "Loading..."
 
 	// render updates the UI from cached data (fast, called on keyboard events)
 	render := func() {
@@ -773,14 +765,9 @@ func main() {
 		ui.Render(processTable)
 	}
 
-	// Initial render (empty UI)
+	// Initial data load and render
+	collectData()
 	render()
-
-	// Load data immediately in background
-	go func() {
-		collectData()
-		render()
-	}()
 
 	uiEvents := ui.PollEvents()
 	ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
