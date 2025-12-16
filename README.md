@@ -22,7 +22,7 @@ this lightweight htop-like system monitor is written in Go.
 |----------|--------|-------|
 | Linux | Full support | All features available |
 | macOS | Full support | All features available |
-| Windows | Supported | Load average not available |
+| Windows | Full support | CPU Queue Length instead of load average |
 | FreeBSD | Full support | All features available |
 
 ## Requirements
@@ -159,13 +159,16 @@ gopsutil provides cross-platform abstractions for:
 - Memory information (mem.VirtualMemory, mem.SwapMemory)
 - Process information (process.Pids, process.NewProcess)
 - Host information (host.Uptime)
-- Load average (load.Avg) - Linux/macOS/FreeBSD only
+- Load average (load.Avg) - Linux/macOS/FreeBSD
+- CPU Queue Length (PDH) - Windows
 
 ## Project Structure
 
 ```
 konrul/
 ├── main.go          # Main application and UI
+├── load_unix.go     # Load average for Unix systems
+├── load_windows.go  # CPU Queue Length for Windows
 ├── go.mod           # Go module definition
 ├── go.sum           # Dependency checksums
 ├── Makefile         # Build automation (Linux/macOS)
