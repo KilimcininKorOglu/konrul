@@ -1,9 +1,11 @@
 # Konrul
 
-**Terminal Based System Monitor**
+**Terminal Based System Monitor** | v1.1.0
 
 Named after the mythological Turkish phoenix-like creature (Konrul/Zümrüdü Anka), 
 this lightweight htop-like system monitor is written in Go.
+
+**Author:** KilimcininKorOglu
 
 ---
 
@@ -17,7 +19,7 @@ this lightweight htop-like system monitor is written in Go.
 | **GPU** | NVIDIA (nvidia-smi), AMD (rocm-smi) |
 | **Docker** | Container stats, ports, IP addresses |
 | **Processes** | List, sort, search, tree view, kill |
-| **Themes** | 4 built-in color schemes |
+| **Themes** | 6 built-in color schemes |
 | **Config** | YAML configuration file |
 
 ---
@@ -36,7 +38,7 @@ this lightweight htop-like system monitor is written in Go.
 | **Per-core CPU** | Yes | Yes |
 | **Process Tree** | Yes | Yes |
 | **Process Search** | Yes | Yes |
-| **Themes** | 4 themes | Yes |
+| **Themes** | 6 themes | Yes |
 | **Config File** | YAML | htoprc |
 | **Memory Usage** | ~15 MB | ~5 MB |
 | **Language** | Go | C |
@@ -117,6 +119,8 @@ build.bat build-all # All platforms
 |:---:|:-------|
 | `Up` / `k` | Scroll up |
 | `Down` / `j` | Scroll down |
+| `Left` | Scroll command left |
+| `Right` | Scroll command right |
 | `Home` | Jump to top |
 | `End` | Jump to bottom |
 
@@ -207,7 +211,7 @@ Press `d` again. Shows Docker containers with ports and IPs.
 | 1234    root     45.2    3.2     S       python train.py            |
 | 5678    www      12.1    1.8     S       nginx: worker process      |
 +---------------------------------------------------------------------+
- F1:Help F8:Sort F9:Kill F10:Quit | /:Search t:Tree d:GPU/Docker
+ Konrul | F1:Help F8:Sort F9:Kill F10:Quit | /:Search t:Tree d:GPU/Docker
 ```
 
 ---
@@ -246,7 +250,7 @@ Config file locations:
 refresh_interval: 1
 default_sort: cpu
 tree_view: false
-theme: default  # default, dark, light, monokai
+theme: default  # default, dark, light, nord, dracula, solarized
 ```
 
 ---
@@ -258,7 +262,9 @@ theme: default  # default, dark, light, monokai
 | `default` | Blue/Green on dark background |
 | `dark` | Muted colors, easy on eyes |
 | `light` | For light terminal backgrounds |
-| `monokai` | Monokai-inspired colors |
+| `nord` | Nord color palette |
+| `dracula` | Dracula theme colors |
+| `solarized` | Solarized dark colors |
 
 Press `T` to cycle through themes at runtime.
 
