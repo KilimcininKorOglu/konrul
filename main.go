@@ -116,21 +116,24 @@ var diskStats DiskStats
 
 // Command-line flags
 var (
-	showVersion   bool
+	showVersion     bool
 	refreshInterval int
-	defaultSort   string
-	startTreeView bool
+	defaultSort     string
+	startTreeView   bool
+	configFile      string
 )
 
 func init() {
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&showVersion, "v", false, "Show version information (shorthand)")
-	flag.IntVar(&refreshInterval, "interval", 1, "Refresh interval in seconds (1-10)")
-	flag.IntVar(&refreshInterval, "i", 1, "Refresh interval in seconds (shorthand)")
-	flag.StringVar(&defaultSort, "sort", "cpu", "Default sort mode (cpu, mem, pid, name)")
-	flag.StringVar(&defaultSort, "s", "cpu", "Default sort mode (shorthand)")
+	flag.IntVar(&refreshInterval, "interval", 0, "Refresh interval in seconds (1-10)")
+	flag.IntVar(&refreshInterval, "i", 0, "Refresh interval in seconds (shorthand)")
+	flag.StringVar(&defaultSort, "sort", "", "Default sort mode (cpu, mem, pid, name)")
+	flag.StringVar(&defaultSort, "s", "", "Default sort mode (shorthand)")
 	flag.BoolVar(&startTreeView, "tree", false, "Start in tree view mode")
 	flag.BoolVar(&startTreeView, "t", false, "Start in tree view mode (shorthand)")
+	flag.StringVar(&configFile, "config", "", "Path to config file")
+	flag.StringVar(&configFile, "c", "", "Path to config file (shorthand)")
 }
 
 func main() {
@@ -144,6 +147,20 @@ func main() {
 		fmt.Printf("  Go:     %s\n", runtime.Version())
 		fmt.Printf("  OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 		os.Exit(0)
+	}
+
+	// Load config file
+	config := LoadConfig()
+
+	// Command-line flags override config file
+	if refreshInterval == 0 {
+		refreshInterval = config.RefreshInterval
+	}
+	if defaultSort == "" {
+		defaultSort = config.DefaultSort
+	}
+	if !startTreeView {
+		startTreeView = config.TreeView
 	}
 
 	// Validate refresh interval

@@ -1,0 +1,19 @@
+# Konrul Configuration File
+# 
+# Location:
+#   Linux/macOS: ~/.config/konrul/config.yaml
+#   Windows: %APPDATA%\konrul\config.yaml
+#
+# Copy this file to the appropriate location and customize.
+
+# Refresh interval in seconds (1-10)
+refresh_interval: 1
+
+# Default sort mode: cpu, mem, pid, name
+default_sort: cpu
+
+# Start in tree view mode
+tree_view: false
+
+# Theme (future feature): default, dark, light
+theme: default
