@@ -791,6 +791,20 @@ func main() {
 		}
 	}
 
+	// Fast UI update for navigation (only updates selection highlight)
+	updateSelection := func() {
+		// Clear all row styles first
+		processTable.RowStyles = make(map[int]ui.Style)
+		processTable.RowStyles[0] = ui.NewStyle(theme.HeaderFg, theme.HeaderBg, ui.ModifierBold)
+
+		// Highlight selected row
+		if selectedRow > 0 && selectedRow < len(processTable.Rows) {
+			processTable.RowStyles[selectedRow] = ui.NewStyle(theme.SelectionFg, theme.SelectionBg)
+		}
+
+		ui.Render(processTable)
+	}
+
 	render()
 
 	uiEvents := ui.PollEvents()
@@ -900,33 +914,45 @@ func main() {
 				grid.SetRect(0, 0, payload.Width, payload.Height)
 				render()
 			case "<Down>", "j":
-				totalProcesses := len(cachedProcesses)
+				totalProcesses := len(processTable.Rows) - 1 // -1 for header
 				if selectedRow < maxVisibleRows && selectedRow < totalProcesses {
 					selectedRow++
+					updateSelection()
 				} else if scrollOffset+maxVisibleRows < totalProcesses {
 					scrollOffset++
+					render()
 				}
-				render()
 			case "<Up>", "k":
 				if selectedRow > 1 {
 					selectedRow--
+					updateSelection()
 				} else if scrollOffset > 0 {
 					scrollOffset--
+					render()
 				}
-				render()
 			case "<Home>":
-				selectedRow = 1
-				scrollOffset = 0
-				render()
+				if scrollOffset == 0 && selectedRow == 1 {
+					// Already at top, do nothing
+				} else if scrollOffset == 0 {
+					selectedRow = 1
+					updateSelection()
+				} else {
+					selectedRow = 1
+					scrollOffset = 0
+					render()
+				}
 			case "<End>":
-				totalProcesses := len(cachedProcesses)
+				totalProcesses := len(processTable.Rows) - 1
 				if totalProcesses > maxVisibleRows {
 					scrollOffset = totalProcesses - maxVisibleRows
 					selectedRow = maxVisibleRows
+					render()
 				} else {
-					selectedRow = totalProcesses
+					if selectedRow != totalProcesses {
+						selectedRow = totalProcesses
+						updateSelection()
+					}
 				}
-				render()
 			case "K", "<Delete>":
 				if len(cachedProcesses) > 0 {
 					// Sort to match display order
