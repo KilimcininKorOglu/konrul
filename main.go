@@ -1252,65 +1252,102 @@ func getSystemInfo() string {
 	)
 }
 
-// getProcesses returns a list of all running processes
+// getProcesses returns a list of all running processes (parallelized for speed)
 func getProcesses() []Process {
-	var processes []Process
-
 	ctx := context.Background()
 	pids, err := process.Pids()
 	if err != nil {
-		return processes
+		return nil
 	}
 
+	// Use worker pool for parallel processing
+	numWorkers := runtime.NumCPU() * 2
+	if numWorkers > 16 {
+		numWorkers = 16
+	}
+
+	type result struct {
+		proc Process
+		ok   bool
+	}
+
+	jobs := make(chan int32, len(pids))
+	results := make(chan result, len(pids))
+
+	// Start workers
+	for w := 0; w < numWorkers; w++ {
+		go func() {
+			for pid := range jobs {
+				proc, err := process.NewProcess(pid)
+				if err != nil {
+					results <- result{ok: false}
+					continue
+				}
+
+				p := Process{PID: pid, User: "-", State: "-"}
+
+				// Get parent PID
+				if ppid, err := proc.PpidWithContext(ctx); err == nil {
+					p.PPID = ppid
+				}
+
+				// Get process name
+				if name, err := proc.NameWithContext(ctx); err == nil {
+					p.Name = name
+					p.Command = name
+				}
+
+				// Get command line (skip on Windows - slow)
+				if runtime.GOOS != "windows" {
+					if cmdline, err := proc.CmdlineWithContext(ctx); err == nil && cmdline != "" {
+						p.Command = cmdline
+					}
+				}
+
+				// Get username (skip on Windows - very slow)
+				if runtime.GOOS != "windows" {
+					if username, err := proc.UsernameWithContext(ctx); err == nil {
+						p.User = username
+					}
+				}
+
+				// Get CPU percent
+				if cpuPercent, err := proc.CPUPercentWithContext(ctx); err == nil {
+					p.CPU = cpuPercent
+				}
+
+				// Get memory percent
+				if memPercent, err := proc.MemoryPercentWithContext(ctx); err == nil {
+					p.Memory = memPercent
+				}
+
+				// Get status (skip on Windows - slow)
+				if runtime.GOOS != "windows" {
+					if status, err := proc.StatusWithContext(ctx); err == nil && len(status) > 0 {
+						p.State = status[0]
+					}
+				} else {
+					p.State = "R" // Running - assume running on Windows
+				}
+
+				results <- result{proc: p, ok: true}
+			}
+		}()
+	}
+
+	// Send jobs
 	for _, pid := range pids {
-		proc, err := process.NewProcess(pid)
-		if err != nil {
-			continue
+		jobs <- pid
+	}
+	close(jobs)
+
+	// Collect results
+	processes := make([]Process, 0, len(pids))
+	for i := 0; i < len(pids); i++ {
+		r := <-results
+		if r.ok {
+			processes = append(processes, r.proc)
 		}
-
-		p := Process{PID: pid}
-
-		// Get parent PID
-		if ppid, err := proc.PpidWithContext(ctx); err == nil {
-			p.PPID = ppid
-		}
-
-		// Get process name
-		if name, err := proc.NameWithContext(ctx); err == nil {
-			p.Name = name
-			p.Command = name
-		}
-
-		// Get command line
-		if cmdline, err := proc.CmdlineWithContext(ctx); err == nil && cmdline != "" {
-			p.Command = cmdline
-		}
-
-		// Get username
-		if username, err := proc.UsernameWithContext(ctx); err == nil {
-			p.User = username
-		} else {
-			p.User = "-"
-		}
-
-		// Get CPU percent
-		if cpuPercent, err := proc.CPUPercentWithContext(ctx); err == nil {
-			p.CPU = cpuPercent
-		}
-
-		// Get memory percent
-		if memPercent, err := proc.MemoryPercentWithContext(ctx); err == nil {
-			p.Memory = memPercent
-		}
-
-		// Get status
-		if status, err := proc.StatusWithContext(ctx); err == nil && len(status) > 0 {
-			p.State = status[0]
-		} else {
-			p.State = "-"
-		}
-
-		processes = append(processes, p)
 	}
 
 	return processes
