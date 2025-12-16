@@ -315,13 +315,6 @@ func main() {
 	var cachedSysInfoText string
 	var cachedNetInfoText string
 	var cachedDiskInfoText string
-	var lastGPUUpdate time.Time
-	var lastDockerUpdate time.Time
-	var lastGPUProcessUpdate time.Time
-	var lastDockerContainerUpdate time.Time
-	var lastSysInfoUpdate time.Time
-	var lastNetInfoUpdate time.Time
-	var lastDiskInfoUpdate time.Time
 
 	// Function to update grid layout based on showDocker toggle
 	updateGridLayout := func() {
@@ -352,16 +345,14 @@ func main() {
 
 	// Cache for processes
 	var cachedProcesses []Process
-	var lastProcessUpdate time.Time
 
-	// Cache for CPU/Memory/Swap (updated every 500ms with process list)
+	// Cache for CPU/Memory/Swap
 	var cachedCPUPercent float64
 	var cachedCorePercents []float64
 	var cachedMemTotal, cachedMemUsed uint64
 	var cachedMemPercent float64
 	var cachedSwapTotal, cachedSwapUsed uint64
 	var cachedSwapPercent float64
-	var lastCPUMemUpdate time.Time
 
 	// Initialize all caches immediately at startup
 	cachedCPUPercent = getCPUPercent()
@@ -374,29 +365,33 @@ func main() {
 	cachedGPUInfoText = FormatGPUInfo()
 	cachedDockerInfoText = FormatDockerInfo()
 	cachedProcesses = getProcesses()
-	initTime := time.Now()
-	lastCPUMemUpdate = initTime
-	lastSysInfoUpdate = initTime
-	lastNetInfoUpdate = initTime
-	lastDiskInfoUpdate = initTime
-	lastProcessUpdate = initTime
-	lastGPUUpdate = initTime
-	lastDockerUpdate = initTime
 
-	render := func() {
-		now := time.Now()
+	// collectData gathers all system data (called only by ticker)
+	collectData := func() {
+		// Update CPU/Memory/Swap
+		cachedCPUPercent = getCPUPercent()
+		cachedCorePercents = getPerCoreCPU()
+		cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
+		cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
 
-		// Update CPU/Memory/Swap (with caching - update every 500ms)
-		// Skip data collection on keyboard events (only update on timer)
-		isTimerUpdate := now.Sub(lastCPUMemUpdate) > 500*time.Millisecond
-		if isTimerUpdate {
-			cachedCPUPercent = getCPUPercent()
-			cachedCorePercents = getPerCoreCPU()
-			cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
-			cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
-			lastCPUMemUpdate = now
+		// Update System/Network/Disk Info
+		cachedSysInfoText = getSystemInfo()
+		cachedNetInfoText = getNetworkInfo()
+		cachedDiskInfoText = getDiskInfo()
+
+		// Update GPU/Docker Info
+		if showDocker {
+			cachedDockerInfoText = FormatDockerInfo()
+		} else {
+			cachedGPUInfoText = FormatGPUInfo()
 		}
 
+		// Update Process Table
+		cachedProcesses = getProcesses()
+	}
+
+	// render updates the UI from cached data (fast, called on keyboard events)
+	render := func() {
 		// Update Total CPU
 		cpuGauge.Percent = int(cachedCPUPercent)
 		cpuGauge.Label = fmt.Sprintf("%.1f%%", cachedCPUPercent)
@@ -426,50 +421,17 @@ func main() {
 			swapGauge.Label = "No Swap"
 		}
 
-		// Update System/Network/Disk Info (with caching - update every 1 second)
-		if now.Sub(lastSysInfoUpdate) > 1*time.Second {
-			cachedSysInfoText = getSystemInfo()
-			lastSysInfoUpdate = now
-		}
+		// Update panel texts from cache (no data collection here!)
 		sysInfo.Text = cachedSysInfoText
-
-		if now.Sub(lastNetInfoUpdate) > 1*time.Second {
-			cachedNetInfoText = getNetworkInfo()
-			lastNetInfoUpdate = now
-		}
 		netInfo.Text = cachedNetInfoText
-
-		if now.Sub(lastDiskInfoUpdate) > 1*time.Second {
-			cachedDiskInfoText = getDiskInfo()
-			lastDiskInfoUpdate = now
-		}
 		diskInfo.Text = cachedDiskInfoText
-
-		// Update GPU/Docker Info based on toggle (with caching - update every 2 seconds)
 		if showDocker {
-			if now.Sub(lastDockerUpdate) > 2*time.Second {
-				cachedDockerInfoText = FormatDockerInfo()
-				lastDockerUpdate = now
-			}
 			dockerInfo.Text = cachedDockerInfoText
 		} else {
-			if now.Sub(lastGPUUpdate) > 2*time.Second {
-				cachedGPUInfoText = FormatGPUInfo()
-				lastGPUUpdate = now
-			}
 			gpuInfo.Text = cachedGPUInfoText
 		}
 
-		// Update Process Table (with caching - 1 second on Windows, 500ms on others)
-		processUpdateInterval := 500 * time.Millisecond
-		if runtime.GOOS == "windows" {
-			processUpdateInterval = 1 * time.Second
-		}
-		if now.Sub(lastProcessUpdate) > processUpdateInterval {
-			cachedProcesses = getProcesses()
-			lastProcessUpdate = now
-		}
-
+		// Use cached processes
 		processes := make([]Process, len(cachedProcesses))
 		copy(processes, cachedProcesses)
 
@@ -572,11 +534,7 @@ func main() {
 		// Render rows based on view mode
 		switch viewMode {
 		case ViewModeGPU:
-			// GPU Process view (cache for 2 seconds)
-			if now.Sub(lastGPUProcessUpdate) > 2*time.Second || cachedGPUProcesses == nil {
-				cachedGPUProcesses = GetGPUProcesses()
-				lastGPUProcessUpdate = now
-			}
+			// GPU Process view (data collected by ticker)
 			gpuProcs := cachedGPUProcesses
 
 			// Sort GPU processes
@@ -640,11 +598,7 @@ func main() {
 			}
 
 		case ViewModeDocker:
-			// Docker Container view (cache for 2 seconds)
-			if now.Sub(lastDockerContainerUpdate) > 2*time.Second || cachedDockerContainers == nil {
-				cachedDockerContainers = GetDockerInfo().Containers
-				lastDockerContainerUpdate = now
-			}
+			// Docker Container view (data collected by ticker)
 			dockerContainers := cachedDockerContainers
 
 			// Sort containers
@@ -1090,10 +1044,12 @@ func main() {
 				}
 			}
 		case <-ticker.C:
-			// Force process list refresh on each tick
-			cachedProcesses = nil
+			// Collect all data in background (this is the only place data is collected!)
+			collectData()
 			if viewMode == ViewModeGPU {
 				cachedGPUProcesses = GetGPUProcesses()
+			} else if viewMode == ViewModeDocker {
+				cachedDockerContainers = GetDockerInfo().Containers
 			}
 			render()
 		}
