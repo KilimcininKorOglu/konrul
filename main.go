@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
@@ -79,7 +80,19 @@ type NetworkStats struct {
 	LastUpdate  time.Time
 }
 
+// DiskStats holds disk I/O statistics
+type DiskStats struct {
+	ReadBytes    uint64
+	WriteBytes   uint64
+	LastRead     uint64
+	LastWrite    uint64
+	ReadPerSec   uint64
+	WritePerSec  uint64
+	LastUpdate   time.Time
+}
+
 var netStats NetworkStats
+var diskStats DiskStats
 
 func main() {
 	if err := ui.Init(); err != nil {
@@ -125,6 +138,11 @@ func main() {
 	netInfo.Title = " Network "
 	netInfo.BorderStyle.Fg = ui.ColorCyan
 
+	// Disk I/O Info
+	diskInfo := widgets.NewParagraph()
+	diskInfo.Title = " Disk "
+	diskInfo.BorderStyle.Fg = ui.ColorCyan
+
 	// Per-core CPU BarChart
 	cpuCores := widgets.NewBarChart()
 	cpuCores.Title = " CPU Cores "
@@ -154,12 +172,13 @@ func main() {
 			ui.NewCol(0.33, memGauge),
 			ui.NewCol(0.34, swapGauge),
 		),
-		ui.NewRow(0.12,
-			ui.NewCol(0.5, cpuCores),
-			ui.NewCol(0.25, netInfo),
-			ui.NewCol(0.25, sysInfo),
+		ui.NewRow(0.15,
+			ui.NewCol(0.40, cpuCores),
+			ui.NewCol(0.20, netInfo),
+			ui.NewCol(0.20, diskInfo),
+			ui.NewCol(0.20, sysInfo),
 		),
-		ui.NewRow(0.78, processTable),
+		ui.NewRow(0.75, processTable),
 	)
 
 	selectedRow := 1
@@ -214,6 +233,9 @@ func main() {
 		// Update Network Info
 		netInfo.Text = getNetworkInfo()
 
+		// Update Disk Info
+		diskInfo.Text = getDiskInfo()
+
 		// Update Process Table (with caching)
 		now := time.Now()
 		if now.Sub(lastProcessUpdate) > 500*time.Millisecond || cachedProcesses == nil {
@@ -260,10 +282,10 @@ func main() {
 		}
 
 		// Calculate visible rows based on terminal height
-		// Process table takes 78% of screen height (0.78 in grid layout)
+		// Process table takes 75% of screen height (0.75 in grid layout)
 		// Subtract 3 for: top border (1) + header row (1) + bottom border (1)
 		termWidth, termHeight = ui.TerminalDimensions()
-		processTableHeight := int(float64(termHeight) * 0.78)
+		processTableHeight := int(float64(termHeight) * 0.75)
 		maxVisibleRows = processTableHeight - 3
 		if maxVisibleRows < 5 {
 			maxVisibleRows = 5
@@ -499,6 +521,58 @@ func getNetworkInfo() string {
 		formatBytes(netStats.BytesSent),
 		formatBytesPerSec(netStats.RecvPerSec),
 		formatBytesPerSec(netStats.SentPerSec),
+	)
+}
+
+// getDiskInfo returns formatted disk I/O and usage information
+func getDiskInfo() string {
+	// Get disk I/O stats
+	ioCounters, err := disk.IOCounters()
+	if err != nil {
+		return "Read: N/A\nWrite: N/A"
+	}
+
+	// Sum up all disk I/O
+	var totalRead, totalWrite uint64
+	for _, counter := range ioCounters {
+		totalRead += counter.ReadBytes
+		totalWrite += counter.WriteBytes
+	}
+
+	now := time.Now()
+
+	// Calculate per-second rates
+	if !diskStats.LastUpdate.IsZero() {
+		elapsed := now.Sub(diskStats.LastUpdate).Seconds()
+		if elapsed > 0 {
+			diskStats.ReadPerSec = uint64(float64(totalRead-diskStats.LastRead) / elapsed)
+			diskStats.WritePerSec = uint64(float64(totalWrite-diskStats.LastWrite) / elapsed)
+		}
+	}
+
+	// Update stats
+	diskStats.ReadBytes = totalRead
+	diskStats.WriteBytes = totalWrite
+	diskStats.LastRead = totalRead
+	diskStats.LastWrite = totalWrite
+	diskStats.LastUpdate = now
+
+	// Get disk usage for root partition
+	usageStr := ""
+	if usage, err := disk.Usage("/"); err == nil {
+		usageStr = fmt.Sprintf("Used: %.1f%%\n", usage.UsedPercent)
+	} else if runtime.GOOS == "windows" {
+		// Try C: drive on Windows
+		if usage, err := disk.Usage("C:"); err == nil {
+			usageStr = fmt.Sprintf("C: %.1f%%\n", usage.UsedPercent)
+		}
+	}
+
+	return fmt.Sprintf(
+		"%sR: %s/s\nW: %s/s",
+		usageStr,
+		formatBytesPerSec(diskStats.ReadPerSec),
+		formatBytesPerSec(diskStats.WritePerSec),
 	)
 }
 
