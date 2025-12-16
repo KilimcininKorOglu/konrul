@@ -1074,7 +1074,10 @@ func main() {
 		case <-ticker.C:
 			// Collect data based on current view mode
 			collectData()
-			render()
+			// Don't re-render if help is showing (prevents flicker)
+			if !showHelp {
+				render()
+			}
 		}
 	}
 }
