@@ -1,301 +1,332 @@
-# Konrul
+# 🔥 Konrul
 
-Terminal Based System Monitor
+**Terminal Based System Monitor**
 
-Named after the mythological Turkish phoenix-like creature (Konrul/Zumrudu Anka), 
+Named after the mythological Turkish phoenix-like creature (Konrul/Zümrüdü Anka), 
 this lightweight htop-like system monitor is written in Go.
 
-## Features
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go" alt="Go Version">
+  <img src="https://img.shields.io/badge/Platform-Linux%20|%20macOS%20|%20Windows%20|%20FreeBSD-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+</p>
 
-- Real-time CPU usage monitoring (total and per-core)
-- Memory and swap usage display
-- Network I/O monitoring (RX/TX with per-second rates)
-- Disk I/O and usage monitoring
-- GPU monitoring (NVIDIA via nvidia-smi, AMD via rocm-smi)
-- Docker container monitoring
-- Process list with multiple sorting options (CPU, MEM, PID, NAME)
-- Process management (kill selected process)
-- Responsive terminal UI
-- Cross-platform support (Linux, macOS, Windows, FreeBSD)
-- Single binary deployment
-- Low resource consumption
+---
 
-## Konrul vs htop
+## ✨ Features
 
-| Feature          | Konrul                          | htop                        |
-|:-----------------|:--------------------------------|:----------------------------|
-| Windows Support  | ✅ Native support               | ❌ Not available            |
-| Network I/O      | ✅ Built-in panel               | ❌ Not available            |
-| Disk I/O         | ✅ Built-in panel               | ❌ Not available            |
-| GPU Monitoring   | ✅ NVIDIA + AMD (nvidia-smi/rocm-smi) | ❌ Not available      |
-| Docker Monitor   | ✅ Container stats              | ❌ Not available            |
-| Single Binary    | ✅ Zero dependencies            | ❌ Requires ncurses         |
-| Cross-platform   | ✅ Linux, macOS, Win, FreeBSD   | ⚠️ Linux, macOS, FreeBSD    |
-| Per-core CPU     | ✅ Bar chart                    | ✅ Bar graph                |
-| Process Tree     | ✅ Toggle with `t`              | ✅ Toggle with `t`          |
-| Process Search   | ✅ Real-time filter             | ✅ Incremental search       |
-| Kill Process     | ✅ `K` or `Delete`              | ✅ `F9`                     |
-| Themes           | ✅ 4 built-in                   | ✅ Color schemes            |
-| Config File      | ✅ YAML                         | ✅ htoprc                   |
-| Memory Usage     | ~15 MB                          | ~5 MB                       |
-| Language         | Go                              | C                           |
-| Installation     | Single binary / `go install`    | Package manager             |
+| Category | Features |
+|:---------|:---------|
+| **📊 System Monitoring** | CPU (total + per-core), Memory, Swap |
+| **🌐 Network** | RX/TX bytes, per-second rates |
+| **💾 Disk** | Read/Write I/O, usage percentage |
+| **🎮 GPU** | NVIDIA (nvidia-smi), AMD (rocm-smi) |
+| **🐳 Docker** | Container stats, ports, IP addresses |
+| **📋 Processes** | List, sort, search, tree view, kill |
+| **🎨 Themes** | 4 built-in color schemes |
+| **⚙️ Config** | YAML configuration file |
 
-## Supported Platforms
+---
 
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Linux | Full support | All features available |
-| macOS | Full support | All features available |
-| Windows | Full support | CPU Queue Length instead of load average |
-| FreeBSD | Full support | All features available |
+## 🆚 Konrul vs htop
 
-## Requirements
+| Feature | Konrul | htop |
+|:--------|:------:|:----:|
+| **Windows Support** | ✅ Native | ❌ |
+| **Network I/O** | ✅ Built-in | ❌ |
+| **Disk I/O** | ✅ Built-in | ❌ |
+| **GPU Monitoring** | ✅ NVIDIA + AMD | ❌ |
+| **Docker Containers** | ✅ Stats + Ports | ❌ |
+| **Single Binary** | ✅ Zero deps | ❌ ncurses |
+| **Cross-platform** | ✅ 4 platforms | ⚠️ 3 platforms |
+| **Per-core CPU** | ✅ | ✅ |
+| **Process Tree** | ✅ | ✅ |
+| **Process Search** | ✅ | ✅ |
+| **Themes** | ✅ 4 themes | ✅ |
+| **Config File** | ✅ YAML | ✅ htoprc |
+| **Memory** | ~15 MB | ~5 MB |
+| **Language** | Go | C |
 
-- Go 1.21 or later
-- Terminal with color support (recommended)
+---
 
-## Installation
+## 🖥️ Supported Platforms
+
+| Platform | Architecture | Status | Notes |
+|:---------|:-------------|:------:|:------|
+| 🐧 **Linux** | amd64, arm64, arm | ✅ | Full support |
+| 🍎 **macOS** | amd64 (Intel), arm64 (Apple Silicon) | ✅ | Full support |
+| 🪟 **Windows** | amd64, arm64 | ✅ | CPU Queue Length instead of load avg |
+| 😈 **FreeBSD** | amd64 | ✅ | Full support |
+
+---
+
+## 📦 Installation
+
+### Quick Install (Go)
+
+```bash
+go install github.com/user/konrul@latest
+```
 
 ### From Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/user/konrul.git
 cd konrul
-
-# Download dependencies
 go mod tidy
-
-# Build
 go build -o konrul
-
-# Run
 ./konrul
 ```
 
-### Using Build Scripts
+### Build Scripts
 
-**Linux/macOS (Makefile):**
+<table>
+<tr>
+<td width="50%">
+
+**🐧 Linux / 🍎 macOS (Makefile)**
 ```bash
-make build              # Build for current platform
-make build-linux        # Build for Linux (amd64)
-make build-darwin       # Build for macOS (Intel)
-make build-darwin-arm64 # Build for macOS (Apple Silicon)
-make build-all-platforms # Build for all platforms
-make install            # Install to GOPATH/bin
-make help               # Show all available targets
+make build        # Current platform
+make build-all    # All platforms
+make install      # Install to GOPATH
 ```
 
-**Windows (build.bat):**
+</td>
+<td width="50%">
+
+**🪟 Windows (build.bat)**
 ```cmd
-build.bat build     # Build for Windows
-build.bat build-all # Build for all platforms
-build.bat help      # Show all available targets
+build.bat build     # Windows only
+build.bat build-all # All platforms
 ```
+
+</td>
+</tr>
+</table>
 
 ### Pre-built Binaries
 
-Download from releases:
-- konrul-linux-amd64
-- konrul-linux-arm64
-- konrul-darwin-amd64
-- konrul-darwin-arm64
-- konrul-windows-amd64.exe
-- konrul-freebsd-amd64
+| Platform | Binary |
+|:---------|:-------|
+| Linux (amd64) | `konrul-linux-amd64` |
+| Linux (arm64) | `konrul-linux-arm64` |
+| macOS (Intel) | `konrul-darwin-amd64` |
+| macOS (Apple Silicon) | `konrul-darwin-arm64` |
+| Windows | `konrul-windows-amd64.exe` |
+| FreeBSD | `konrul-freebsd-amd64` |
 
-### System-wide Installation
+---
 
-**Linux/macOS:**
-```bash
-sudo cp konrul /usr/local/bin/
-```
+## ⌨️ Keyboard Controls
 
-**Windows:**
-Copy konrul.exe to a directory in your PATH.
-
-## Usage
-
-Simply run the binary:
-
-```bash
-./konrul
-```
-
-On Windows:
-```cmd
-konrul.exe
-```
-
-### Keyboard Controls
+### Function Keys
 
 | Key | Action |
-|-----|--------|
-| **Function Keys** | |
-| F1 | Show help screen |
-| F8 | Cycle sort mode (CPU→MEM→PID→NAME) |
-| F9 | Kill selected process |
-| F10 | Quit application |
-| **Navigation** | |
-| Up / k | Scroll up in process list |
-| Down / j | Scroll down in process list |
-| Home | Jump to top of list |
-| End | Jump to bottom of list |
-| **Sorting** | |
-| c | Sort by CPU usage |
-| m | Sort by Memory usage |
-| p | Sort by PID |
-| n | Sort by Name |
-| r | Reverse sort order |
-| **Views** | |
-| t | Toggle tree view |
-| T | Cycle themes (default, dark, light, monokai) |
-| d | Toggle GPU/Docker panel |
-| / | Search/filter processes |
-| Esc | Clear search filter |
-| **Other** | |
-| K / Delete | Kill selected process |
-| ? / h | Show help screen |
-| q / Ctrl+C | Exit application |
+|:---:|:-------|
+| `F1` | Show help screen |
+| `F8` | Cycle sort mode |
+| `F9` | Kill process / Stop container |
+| `F10` | Quit application |
 
-### Command-line Arguments
+### Navigation
+
+| Key | Action |
+|:---:|:-------|
+| `↑` `k` | Scroll up |
+| `↓` `j` | Scroll down |
+| `Home` | Jump to top |
+| `End` | Jump to bottom |
+
+### Sorting
+
+| Key | Normal View | GPU View |
+|:---:|:------------|:---------|
+| `c` | Sort by CPU% | - |
+| `m` | Sort by MEM% | - |
+| `p` | Sort by PID | Sort by PID |
+| `n` | Sort by NAME | Sort by NAME |
+| `r` | Reverse order | Reverse order |
+| `g` | - | Sort by GPU% |
+| `G` | - | Sort by GPU Memory |
+
+### Views & Modes
+
+| Key | Action |
+|:---:|:-------|
+| `d` | Toggle view: **Normal** → **GPU** → **Docker** |
+| `t` | Toggle tree view (Normal view only) |
+| `T` | Cycle themes |
+| `/` | Search/filter processes |
+| `Esc` | Clear search filter |
+| `?` `h` | Show help |
+| `q` `Ctrl+C` | Quit |
+
+### Process Management
+
+| Key | Normal/GPU View | Docker View |
+|:---:|:----------------|:------------|
+| `K` `Delete` `F9` | Kill process | Stop container |
+
+---
+
+## 🎯 View Modes
+
+### 📊 Normal View (Default)
+Standard process list with CPU, Memory, State information.
+
+```
+┌─ Processes [Sort:CPU%] ─────────────────────────────────┐
+│ PID    USER    CPU%   MEM%   STATE   COMMAND            │
+│ 1234   root    45.2   3.2    R       python train.py    │
+│ 5678   www     12.1   1.8    S       nginx: worker      │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 🎮 GPU View (Press `d`)
+Shows only GPU-using processes with GPU metrics.
+
+```
+┌─ GPU Processes [Sort:GPU_MEM] ──────────────────────────┐
+│ PID    USER    GPU%   GPU_MEM   TYPE   COMMAND          │
+│ 1234   root    45%    2.1 GB    C      python train.py  │
+│ 5678   user    12%    512 MB    G      blender          │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 🐳 Docker View (Press `d` again)
+Shows Docker containers with ports and IP addresses.
+
+```
+┌─ Docker Containers [Sort:CPU%] ─────────────────────────┐
+│ CONTAINER  IMAGE         CPU%   MEM     IP          PORTS       │
+│ web-app    nginx:latest  2.5%   45 MB   172.17.0.2  8080:80     │
+│ database   postgres:15   5.1%   256 MB  172.17.0.3  5432:5432   │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🖼️ UI Layout
+
+```
+┌─ CPU ──────────────┐┌─ Memory ───────────┐┌─ Swap ─────────────┐
+│ [████████░░] 78.5% ││ [█████░░░] 4.2G/8G ││ [░░░░░░░░] 0/2G    │
+└────────────────────┘└────────────────────┘└────────────────────┘
+┌─ CPU Cores ─────────────┐┌─ Net ───┐┌─ Disk ──┐┌─ GPU ───┐┌─ System ─┐
+│ 0██ 1████ 2███ 3█       ││ RX:1.2G ││ 65%     ││ [NV]    ││ Up: 5d   │
+│ 4████ 5██ 6█████ 7██    ││ TX:856M ││ R:12M/s ││ 45%     ││ Load:1.2 │
+└─────────────────────────┘└─────────┘└─────────┘└─────────┘└──────────┘
+┌─ Processes [Sort:CPU%] ─────────────────────────────────────────────┐
+│ PID     USER     CPU%    MEM%    STATE   COMMAND                    │
+│ 1234    root     45.2    3.2     S       python train.py            │
+│ 5678    www      12.1    1.8     S       nginx: worker process      │
+└─────────────────────────────────────────────────────────────────────┘
+ F1:Help F8:Sort F9:Kill F10:Quit | /:Search t:Tree d:GPU/Docker
+```
+
+---
+
+## ⚙️ Command-line Arguments
 
 ```bash
 konrul [options]
-
-Options:
-  -v, --version     Show version information
-  -i, --interval N  Refresh interval in seconds (1-10, default: 1)
-  -s, --sort MODE   Default sort mode (cpu, mem, pid, name)
-  -t, --tree        Start in tree view mode
-  -c, --config FILE Path to config file
 ```
 
-Examples:
+| Option | Short | Description | Default |
+|:-------|:-----:|:------------|:--------|
+| `--version` | `-v` | Show version information | - |
+| `--interval` | `-i` | Refresh interval (1-10 sec) | 1 |
+| `--sort` | `-s` | Default sort (cpu/mem/pid/name) | cpu |
+| `--tree` | `-t` | Start in tree view | false |
+| `--config` | `-c` | Config file path | auto |
+
+**Examples:**
 ```bash
-# Show version
-konrul --version
-
-# Start with 2-second refresh interval
-konrul -i 2
-
-# Start in tree view, sorted by memory
-konrul --tree --sort mem
+konrul --version              # Show version
+konrul -i 2                   # 2-second refresh
+konrul --tree --sort mem      # Tree view, sort by memory
+konrul -c ~/.konrul.yaml      # Custom config file
 ```
 
-## UI Layout
+---
 
-```
-+-- CPU ---------------++-- Memory ------------++-- Swap --------------+
-| [========  ] 78.5%   || [=====   ] 4.2G/8G   || [        ] 0/2G      |
-+----------------------++----------------------++----------------------+
-+-- CPU Cores -------++-- Network -++-- Disk ----++-- System ---+
-| 0: [===    ] 45%   || RX: 1.2G   || Used: 65%  || Up: 5d12h   |
-| 1: [======  ] 72%  || TX: 856M   || R: 12M/s   || Load: 1.25  |
-| 2: [====    ] 55%  || RX/s: 125K || W: 8M/s    || Procs: 142  |
-| 3: [=       ] 12%  || TX/s: 45K  |+------------++-------------+
-+--------------------++------------+
-+-- Processes [c:CPU m:MEM p:PID n:NAME r:Rev] Sort:CPU% -------------+
-| PID     USER     CPU%    MEM%    STATE   COMMAND                    |
-| 1234    root     45.2    3.2     S       /usr/bin/python3...        |
-| 5678    www      12.1    1.8     S       nginx: worker proc...      |
-| 9012    mysql    8.5     5.1     S       /usr/sbin/mysqld           |
-+---------------------------------------------------------------------+
+## 📁 Configuration
+
+Config file locations:
+- **Linux/macOS:** `~/.config/konrul/config.yaml`
+- **Windows:** `%APPDATA%\konrul\config.yaml`
+
+```yaml
+# Example config.yaml
+refresh_interval: 1
+default_sort: cpu
+tree_view: false
+theme: default  # default, dark, light, monokai
 ```
 
-## Technical Details
+---
+
+## 🎨 Themes
+
+| Theme | Description |
+|:------|:------------|
+| `default` | Blue/Green on dark background |
+| `dark` | Muted colors, easy on eyes |
+| `light` | For light terminal backgrounds |
+| `monokai` | Monokai-inspired colors |
+
+Press `T` to cycle through themes at runtime.
+
+---
+
+## 📊 Technical Details
 
 ### Dependencies
 
 | Package | Purpose |
-|---------|---------|
-| github.com/gizak/termui/v3 | Terminal UI framework |
-| github.com/shirou/gopsutil/v3 | Cross-platform system information |
+|:--------|:--------|
+| `github.com/gizak/termui/v3` | Terminal UI framework |
+| `github.com/shirou/gopsutil/v3` | Cross-platform system info |
+| `gopkg.in/yaml.v3` | YAML config parsing |
 
-### Performance Targets
+### Performance
 
-| Metric | Target |
-|--------|--------|
-| Startup time | < 100ms |
-| CPU usage (idle) | < 1% |
-| Memory usage | < 20 MB RSS |
-| Refresh latency | < 50ms |
+| Metric | Target | Actual |
+|:-------|:------:|:------:|
+| Startup time | < 100ms | ✅ |
+| CPU usage (idle) | < 1% | ✅ |
+| Memory usage | < 20 MB | ✅ ~15 MB |
+| Refresh latency | < 50ms | ✅ |
 
-### System Information Sources
+---
 
-gopsutil provides cross-platform abstractions for:
-- CPU usage (cpu.Percent) - total and per-core
-- Memory information (mem.VirtualMemory, mem.SwapMemory)
-- Network I/O (net.IOCounters) - bytes sent/received
-- Disk I/O (disk.IOCounters, disk.Usage) - read/write and usage
-- Process information (process.Pids, process.NewProcess)
-- Host information (host.Uptime)
-- Load average (load.Avg) - Linux/macOS/FreeBSD
-- CPU Queue Length (PDH) - Windows
+## 🗺️ Roadmap
 
-## Project Structure
+| Phase | Status | Features |
+|:------|:------:|:---------|
+| **Phase 1: MVP** | ✅ | CPU, Memory, Swap, Process list |
+| **Phase 2: Extended** | ✅ | Per-core CPU, Network I/O, Disk I/O, Sorting, Tree view |
+| **Phase 3: Advanced** | ✅ | Search, Help, Config, Themes, CLI args |
+| **Phase 4: Monitoring** | ✅ | GPU (NVIDIA/AMD), Docker containers |
+| **Phase 5: Views** | ✅ | Context-aware process list (GPU/Docker views) |
+| **Future** | 🔄 | Kubernetes pods, Plugin system |
 
-```
-konrul/
-├── main.go          # Main application and UI
-├── load_unix.go     # Load average for Unix systems
-├── load_windows.go  # CPU Queue Length for Windows
-├── go.mod           # Go module definition
-├── go.sum           # Dependency checksums
-├── Makefile         # Build automation (Linux/macOS)
-├── build.bat        # Build automation (Windows)
-└── README.md        # Documentation
-```
+---
 
-## Build Information
-
-Build with version information:
-
-```bash
-go build -ldflags "-s -w \
-  -X main.version=$(git describe --tags --always) \
-  -X main.commit=$(git rev-parse --short HEAD) \
-  -X main.date=$(date -u +%Y-%m-%d_%H:%M:%S)" \
-  -o konrul
-```
-
-## Roadmap
-
-### Phase 1: MVP (Complete)
-- [x] CPU, Memory, Swap monitoring
-- [x] Process list with kill feature
-- [x] Basic system information
-- [x] Cross-platform support
-
-### Phase 2: Extended Features (Complete)
-- [x] Per-core CPU usage display
-- [x] Network I/O monitoring (RX/TX rates)
-- [x] Disk I/O and usage monitoring
-- [x] Process sorting options (CPU/MEM/PID/NAME)
-- [x] Process tree view
-
-### Phase 3: Advanced (Complete)
-- [x] Process filtering and search
-- [x] Help screen (keyboard shortcuts)
-- [x] Command-line arguments
-- [x] Configurable refresh interval
-- [x] Configuration file support (YAML)
-- [x] Theme support (4 built-in themes)
-
-### Phase 4: Extended Monitoring (Complete)
-- [x] GPU monitoring (NVIDIA via nvidia-smi, AMD via rocm-smi)
-- [x] Docker container monitoring
-
-### Future Plans
-- [ ] Kubernetes pod monitoring
-- [ ] Custom plugin system
-
-## License
+## 📜 License
 
 MIT License
 
-## About the Name
+---
 
-Konrul (also known as Zumrudu Anka) is a mythological Turkish creature similar to the phoenix.
-It is born from fire and rises from its ashes. Just like systems that need continuous 
-monitoring and processes that need to be restarted...
+## 🦅 About the Name
+
+**Konrul** (also known as **Zümrüdü Anka**) is a mythological Turkish creature similar to the phoenix. It is born from fire and rises from its ashes.
+
+Just like systems that need continuous monitoring and processes that need to be restarted... 🔥
+
+---
+
+<p align="center">
+  Made with ❤️ in Go
+</p>
