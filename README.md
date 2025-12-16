@@ -131,23 +131,32 @@ konrul.exe
 
 | Key | Action |
 |-----|--------|
-| q / Ctrl+C | Exit application |
+| **Function Keys** | |
+| F1 | Show help screen |
+| F8 | Cycle sort mode (CPU→MEM→PID→NAME) |
+| F9 | Kill selected process |
+| F10 | Quit application |
+| **Navigation** | |
 | Up / k | Scroll up in process list |
 | Down / j | Scroll down in process list |
-| K / Delete | Kill selected process |
 | Home | Jump to top of list |
 | End | Jump to bottom of list |
+| **Sorting** | |
 | c | Sort by CPU usage |
 | m | Sort by Memory usage |
 | p | Sort by PID |
 | n | Sort by Name |
 | r | Reverse sort order |
+| **Views** | |
 | t | Toggle tree view |
 | T | Cycle themes (default, dark, light, monokai) |
 | d | Toggle GPU/Docker panel |
 | / | Search/filter processes |
 | Esc | Clear search filter |
+| **Other** | |
+| K / Delete | Kill selected process |
 | ? / h | Show help screen |
+| q / Ctrl+C | Exit application |
 
 ### Command-line Arguments
 
