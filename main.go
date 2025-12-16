@@ -354,49 +354,35 @@ func main() {
 	var cachedSwapTotal, cachedSwapUsed uint64
 	var cachedSwapPercent float64
 
-	// Initialize fast caches at startup (slow ones loaded by first ticker)
-	cachedCPUPercent = getCPUPercent()
-	cachedCorePercents = getPerCoreCPU()
-	cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
-	cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
-	// Set placeholder text for slow data (will be updated by ticker)
-	cachedSysInfoText = "Loading..."
-	cachedNetInfoText = "Loading..."
-	cachedDiskInfoText = "Loading..."
-	cachedGPUInfoText = "Loading..."
-	cachedDockerInfoText = "Loading..."
-	// Process list will be empty until first ticker
-
 	// collectData gathers system data based on current view mode
 	collectData := func() {
-		// Update CPU/Memory/Swap (always needed)
+		// Update CPU/Memory/Swap (always needed, fast)
 		cachedCPUPercent = getCPUPercent()
 		cachedCorePercents = getPerCoreCPU()
 		cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
 		cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
 
-		// Update System/Network/Disk Info (always needed for panels)
+		// Update System/Network/Disk Info
 		cachedSysInfoText = getSystemInfo()
 		cachedNetInfoText = getNetworkInfo()
 		cachedDiskInfoText = getDiskInfo()
 
-		// Update data based on current view mode only
+		// Update view-specific data only
 		switch viewMode {
 		case ViewModeNormal:
-			// Normal view: only process list needed
 			cachedProcesses = getProcesses()
-			// Update GPU panel info (for the small panel, not the list)
 			cachedGPUInfoText = FormatGPUInfo()
 		case ViewModeGPU:
-			// GPU view: only GPU processes needed
 			cachedGPUProcesses = GetGPUProcesses()
 			cachedGPUInfoText = FormatGPUInfo()
 		case ViewModeDocker:
-			// Docker view: only Docker containers needed
 			cachedDockerContainers = GetDockerInfo().Containers
 			cachedDockerInfoText = FormatDockerInfo()
 		}
 	}
+
+	// Initial data load (blocking, but only once)
+	collectData()
 
 	// render updates the UI from cached data (fast, called on keyboard events)
 	render := func() {
@@ -779,12 +765,6 @@ func main() {
 	}
 
 	render()
-
-	// Start background data collection immediately
-	go func() {
-		collectData()
-		render()
-	}()
 
 	uiEvents := ui.PollEvents()
 	ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
