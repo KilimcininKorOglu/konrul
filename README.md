@@ -120,6 +120,7 @@ konrul.exe
 | n | Sort by Name |
 | r | Reverse sort order |
 | t | Toggle tree view |
+| T | Cycle themes (default, dark, light, monokai) |
 | / | Search/filter processes |
 | Esc | Clear search filter |
 | ? / h | Show help screen |
@@ -134,6 +135,7 @@ Options:
   -i, --interval N  Refresh interval in seconds (1-10, default: 1)
   -s, --sort MODE   Default sort mode (cpu, mem, pid, name)
   -t, --tree        Start in tree view mode
+  -c, --config FILE Path to config file
 ```
 
 Examples:
@@ -244,10 +246,10 @@ go build -ldflags "-s -w \
 - [x] Help screen (keyboard shortcuts)
 - [x] Command-line arguments
 - [x] Configurable refresh interval
+- [x] Configuration file support (YAML)
+- [x] Theme support (4 built-in themes)
 
 ### Phase 4: Future (Planned)
-- [ ] Configuration file support
-- [ ] Theme support
 - [ ] GPU monitoring (NVIDIA/AMD)
 - [ ] Docker container monitoring
 
