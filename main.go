@@ -226,10 +226,15 @@ func main() {
 	diskInfo.Title = " Disk "
 	diskInfo.BorderStyle.Fg = theme.BorderColor
 
-	// GPU Info
+	// GPU/Docker Info (shared panel, toggle with 'd')
 	gpuInfo := widgets.NewParagraph()
 	gpuInfo.Title = " GPU "
 	gpuInfo.BorderStyle.Fg = theme.BorderColor
+
+	// Docker Info
+	dockerInfo := widgets.NewParagraph()
+	dockerInfo.Title = " Docker "
+	dockerInfo.BorderStyle.Fg = theme.BorderColor
 
 	// Per-core CPU BarChart
 	cpuCores := widgets.NewBarChart()
@@ -254,22 +259,6 @@ func main() {
 	termWidth, termHeight := ui.TerminalDimensions()
 	grid.SetRect(0, 0, termWidth, termHeight)
 
-	grid.Set(
-		ui.NewRow(0.10,
-			ui.NewCol(0.33, cpuGauge),
-			ui.NewCol(0.33, memGauge),
-			ui.NewCol(0.34, swapGauge),
-		),
-		ui.NewRow(0.15,
-			ui.NewCol(0.35, cpuCores),
-			ui.NewCol(0.15, netInfo),
-			ui.NewCol(0.15, diskInfo),
-			ui.NewCol(0.15, gpuInfo),
-			ui.NewCol(0.20, sysInfo),
-		),
-		ui.NewRow(0.75, processTable),
-	)
-
 	selectedRow := 1
 	scrollOffset := 0
 	maxVisibleRows := 15
@@ -283,6 +272,33 @@ func main() {
 	searchMode := false
 	searchQuery := ""
 	showHelp := false
+	showDocker := false // Toggle between GPU and Docker panel
+
+	// Function to update grid layout based on showDocker toggle
+	updateGridLayout := func() {
+		var infoPanel *widgets.Paragraph
+		if showDocker {
+			infoPanel = dockerInfo
+		} else {
+			infoPanel = gpuInfo
+		}
+		grid.Set(
+			ui.NewRow(0.10,
+				ui.NewCol(0.33, cpuGauge),
+				ui.NewCol(0.33, memGauge),
+				ui.NewCol(0.34, swapGauge),
+			),
+			ui.NewRow(0.15,
+				ui.NewCol(0.35, cpuCores),
+				ui.NewCol(0.15, netInfo),
+				ui.NewCol(0.15, diskInfo),
+				ui.NewCol(0.15, infoPanel),
+				ui.NewCol(0.20, sysInfo),
+			),
+			ui.NewRow(0.75, processTable),
+		)
+	}
+	updateGridLayout() // Initial layout
 
 	// Cache for processes
 	var cachedProcesses []Process
@@ -331,8 +347,12 @@ func main() {
 		// Update Disk Info
 		diskInfo.Text = getDiskInfo()
 
-		// Update GPU Info
-		gpuInfo.Text = FormatGPUInfo()
+		// Update GPU/Docker Info based on toggle
+		if showDocker {
+			dockerInfo.Text = FormatDockerInfo()
+		} else {
+			gpuInfo.Text = FormatGPUInfo()
+		}
 
 		// Update Process Table (with caching)
 		now := time.Now()
@@ -643,9 +663,15 @@ func main() {
 				netInfo.BorderStyle.Fg = theme.BorderColor
 				diskInfo.BorderStyle.Fg = theme.BorderColor
 				gpuInfo.BorderStyle.Fg = theme.BorderColor
+				dockerInfo.BorderStyle.Fg = theme.BorderColor
 				cpuCores.BorderStyle.Fg = theme.BorderColor
 				cpuCores.BarColors = theme.BarColors
 				cpuCores.LabelStyles = []ui.Style{ui.NewStyle(theme.LabelColor)}
+				render()
+			case "d":
+				// Toggle between GPU and Docker panel
+				showDocker = !showDocker
+				updateGridLayout()
 				render()
 			}
 		case <-ticker.C:
@@ -899,6 +925,7 @@ func renderHelp(termWidth, termHeight int) {
  Views:
    t          Toggle tree view
    T          Cycle themes
+   d          Toggle GPU/Docker panel
    /          Search/filter processes
    Esc        Clear search filter
 
