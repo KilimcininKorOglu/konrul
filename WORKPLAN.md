@@ -201,34 +201,67 @@ cat /proc/1234/cgroup
 1. **docker.go'yu genislet:**
 ```go
 type DockerContainerView struct {
-    ID       string
-    Name     string
-    Image    string
-    Status   string
-    State    string
-    CPUPerc  float64
-    MemUsage string
-    MemPerc  float64
-    Ports    string
+    ID        string
+    Name      string
+    Image     string
+    Status    string
+    State     string
+    CPUPerc   float64
+    MemUsage  string
+    MemPerc   float64
+    Ports     string   // "8080:80, 443:443"
+    HostPorts []string // ["8080", "443"]
+    ContPorts []string // ["80", "443"]
+    IPAddress string   // Container IP (172.17.0.2)
+    Networks  string   // Network adlari (bridge, custom_net)
 }
 
 func GetDockerContainersDetailed() []DockerContainerView {
-    // docker ps + docker stats birlestir
+    // docker ps + docker stats + docker inspect birlestir
 }
 ```
 
-2. **Yeni tablo formati:**
+**Port ve IP bilgisi alma komutlari:**
+```bash
+# Port bilgisi (docker ps ile)
+docker ps --format '{{.Ports}}'
+# Ornek cikti: 0.0.0.0:8080->80/tcp, :::443->443/tcp
+
+# Container IP (docker inspect ile)
+docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' <container>
+# Ornek cikti: 172.17.0.2
+
+# Tum bilgiler tek seferde (JSON)
+docker inspect --format '{{json .NetworkSettings}}' <container>
+```
+
+2. **Yeni tablo formati (Port ve IP ile):**
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ Docker Containers [d:toggle] Sort:CPU                                            │
+├────────────┬───────────────┬───────┬────────┬──────────────┬─────────────────────┤
+│ CONTAINER  │ IMAGE         │ CPU%  │ MEM    │ IP           │ PORTS               │
+├────────────┼───────────────┼───────┼────────┼──────────────┼─────────────────────┤
+│ web-app    │ nginx:latest  │ 2.5%  │ 45 MB  │ 172.17.0.2   │ 8080:80, 443:443    │
+│ database   │ postgres:15   │ 5.1%  │ 256 MB │ 172.17.0.3   │ 5432:5432           │
+│ redis      │ redis:7       │ 0.3%  │ 12 MB  │ 172.17.0.4   │ 6379:6379           │
+│ api-server │ node:18       │ 3.2%  │ 128 MB │ 172.18.0.2   │ 3000:3000, 9229:9229│
+└────────────┴───────────────┴───────┴────────┴──────────────┴─────────────────────┘
+```
+
+**Alternatif kompakt format (dar terminaller icin):**
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Docker Containers [d:toggle] Sort:CPU                           │
-├──────────────┬──────────────────┬───────┬─────────┬────────────┤
-│ CONTAINER    │ IMAGE            │ CPU%  │ MEM     │ STATUS     │
-├──────────────┼──────────────────┼───────┼─────────┼────────────┤
-│ web-app      │ nginx:latest     │ 2.5%  │ 45 MB   │ Up 2 hours │
-│ database     │ postgres:15      │ 5.1%  │ 256 MB  │ Up 2 hours │
-│ redis-cache  │ redis:7-alpine   │ 0.3%  │ 12 MB   │ Up 2 hours │
-└──────────────┴──────────────────┴───────┴─────────┴────────────┘
+│ Docker Containers Sort:CPU                                      │
+├────────────┬───────────────┬───────┬────────┬──────────────────┤
+│ CONTAINER  │ IMAGE         │ CPU%  │ MEM    │ PORTS            │
+├────────────┼───────────────┼───────┼────────┼──────────────────┤
+│ web-app    │ nginx         │ 2.5%  │ 45 MB  │ :8080→80         │
+│ database   │ postgres      │ 5.1%  │ 256 MB │ :5432→5432       │
+└────────────┴───────────────┴───────┴────────┴──────────────────┘
 ```
+- IP bilgisi STATUS yerine PORTS kolonunda hover/detay olarak
+- Port formati: `:host→container` (kisaltilmis)
 
 3. **Sorting secenekleri (Docker view):**
    - CPU%: Container CPU kullanimi
