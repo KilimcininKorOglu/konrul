@@ -4,6 +4,7 @@ Konrul-PRD.md
 # Go build artifacts
 konrul
 konrul.exe
+bin/
 *.exe
 *.exe~
 *.dll
