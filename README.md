@@ -12,14 +12,23 @@ this lightweight htop-like system monitor is written in Go.
 - Process list with sorting by CPU usage
 - Process management (kill selected process)
 - Responsive terminal UI
-- Single binary, no external dependencies
+- Cross-platform support (Linux, macOS, Windows, FreeBSD)
+- Single binary deployment
 - Low resource consumption
+
+## Supported Platforms
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Linux | Full support | All features available |
+| macOS | Full support | All features available |
+| Windows | Supported | Load average not available |
+| FreeBSD | Full support | All features available |
 
 ## Requirements
 
 - Go 1.21 or later
-- Linux operating system (requires procfs)
-- Terminal with 256 color support (recommended)
+- Terminal with color support (recommended)
 
 ## Installation
 
@@ -44,10 +53,13 @@ go build -o konrul
 
 **Linux/macOS (Makefile):**
 ```bash
-make build          # Build for current platform
-make build-linux    # Build for Linux
-make install        # Install to GOPATH/bin
-make help           # Show all available targets
+make build              # Build for current platform
+make build-linux        # Build for Linux (amd64)
+make build-darwin       # Build for macOS (Intel)
+make build-darwin-arm64 # Build for macOS (Apple Silicon)
+make build-all-platforms # Build for all platforms
+make install            # Install to GOPATH/bin
+make help               # Show all available targets
 ```
 
 **Windows (build.bat):**
@@ -57,11 +69,25 @@ build.bat build-all # Build for all platforms
 build.bat help      # Show all available targets
 ```
 
+### Pre-built Binaries
+
+Download from releases:
+- konrul-linux-amd64
+- konrul-linux-arm64
+- konrul-darwin-amd64
+- konrul-darwin-arm64
+- konrul-windows-amd64.exe
+- konrul-freebsd-amd64
+
 ### System-wide Installation
 
+**Linux/macOS:**
 ```bash
 sudo cp konrul /usr/local/bin/
 ```
+
+**Windows:**
+Copy konrul.exe to a directory in your PATH.
 
 ## Usage
 
@@ -69,6 +95,11 @@ Simply run the binary:
 
 ```bash
 ./konrul
+```
+
+On Windows:
+```cmd
+konrul.exe
 ```
 
 ### Keyboard Controls
@@ -93,6 +124,7 @@ Simply run the binary:
 |                               || Uptime: 5d 12h 30m              |
 +-------------------------------+| Load: 1.25 0.87 0.52            |
                                  | Processes: 142                  |
+                                 | Platform: linux                 |
                                  +----------------------------------+
 +-- Processes (Up/Down: scroll, q: quit, K: kill) -----------------+
 | PID     USER     CPU%    MEM%    STATE   COMMAND                 |
@@ -104,15 +136,12 @@ Simply run the binary:
 
 ## Technical Details
 
-### Data Sources
+### Dependencies
 
-| File | Data | Usage |
-|------|------|-------|
-| /proc/stat | CPU timing | CPU percentage calculation |
-| /proc/meminfo | Memory details | RAM and Swap info |
-| /proc/[pid]/* | Process info | Process list |
-| /proc/uptime | System uptime | Uptime display |
-| /proc/loadavg | Load average | System load |
+| Package | Purpose |
+|---------|---------|
+| github.com/gizak/termui/v3 | Terminal UI framework |
+| github.com/shirou/gopsutil/v3 | Cross-platform system information |
 
 ### Performance Targets
 
@@ -123,9 +152,14 @@ Simply run the binary:
 | Memory usage | < 20 MB RSS |
 | Refresh latency | < 50ms |
 
-### Dependencies
+### System Information Sources
 
-- github.com/gizak/termui/v3 - Terminal UI framework
+gopsutil provides cross-platform abstractions for:
+- CPU usage (cpu.Percent)
+- Memory information (mem.VirtualMemory, mem.SwapMemory)
+- Process information (process.Pids, process.NewProcess)
+- Host information (host.Uptime)
+- Load average (load.Avg) - Linux/macOS/FreeBSD only
 
 ## Project Structure
 
@@ -153,10 +187,11 @@ go build -ldflags "-s -w \
 
 ## Roadmap
 
-### Phase 1: MVP (Current)
+### Phase 1: MVP (Complete)
 - CPU, Memory, Swap monitoring
 - Process list with kill feature
 - Basic system information
+- Cross-platform support
 
 ### Phase 2: Extended Features
 - Per-core CPU usage
@@ -170,11 +205,6 @@ go build -ldflags "-s -w \
 - GPU monitoring (NVIDIA/AMD)
 - Docker container monitoring
 - Configuration file support
-
-### Phase 4: Multi-platform
-- macOS support
-- FreeBSD support
-- Windows support (WMI)
 
 ## License
 
