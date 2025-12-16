@@ -1256,14 +1256,12 @@ func getProcesses() []Process {
 					p.Command = name
 				}
 
-				// Get command line (skip on Windows - slow)
-				if runtime.GOOS != "windows" {
-					if cmdline, err := proc.CmdlineWithContext(ctx); err == nil && cmdline != "" {
-						p.Command = cmdline
-					}
+				// Get command line (full path)
+				if cmdline, err := proc.CmdlineWithContext(ctx); err == nil && cmdline != "" {
+					p.Command = cmdline
 				}
 
-				// Get username (skip on Windows - very slow)
+				// Get username (skip on Windows - very slow even with parallelization)
 				if runtime.GOOS != "windows" {
 					if username, err := proc.UsernameWithContext(ctx); err == nil {
 						p.User = username
