@@ -236,6 +236,12 @@ func main() {
 	dockerInfo.Title = " Docker "
 	dockerInfo.BorderStyle.Fg = theme.BorderColor
 
+	// Status Bar (bottom)
+	statusBar := widgets.NewParagraph()
+	statusBar.Border = false
+	statusBar.Text = " F1:Help F8:Sort F9:Kill F10:Quit | /:Search t:Tree d:Docker T:Theme "
+	statusBar.TextStyle = ui.NewStyle(ui.ColorBlack, ui.ColorWhite)
+
 	// Per-core CPU BarChart
 	cpuCores := widgets.NewBarChart()
 	cpuCores.Title = " CPU Cores "
@@ -288,14 +294,15 @@ func main() {
 				ui.NewCol(0.33, memGauge),
 				ui.NewCol(0.34, swapGauge),
 			),
-			ui.NewRow(0.15,
+			ui.NewRow(0.14,
 				ui.NewCol(0.35, cpuCores),
 				ui.NewCol(0.15, netInfo),
 				ui.NewCol(0.15, diskInfo),
 				ui.NewCol(0.15, infoPanel),
 				ui.NewCol(0.20, sysInfo),
 			),
-			ui.NewRow(0.75, processTable),
+			ui.NewRow(0.73, processTable),
+			ui.NewRow(0.03, statusBar),
 		)
 	}
 	updateGridLayout() // Initial layout
@@ -420,10 +427,10 @@ func main() {
 		}
 
 		// Calculate visible rows based on terminal height
-		// Process table takes 75% of screen height (0.75 in grid layout)
+		// Process table takes 73% of screen height (0.73 in grid layout)
 		// Subtract 3 for: top border (1) + header row (1) + bottom border (1)
 		termWidth, termHeight = ui.TerminalDimensions()
-		processTableHeight := int(float64(termHeight) * 0.75)
+		processTableHeight := int(float64(termHeight) * 0.73)
 		maxVisibleRows = processTableHeight - 3
 		if maxVisibleRows < 5 {
 			maxVisibleRows = 5
@@ -547,8 +554,56 @@ func main() {
 			}
 
 			switch e.ID {
-			case "q", "<C-c>":
+			case "q", "<C-c>", "<F10>":
 				return
+			case "<F1>", "?", "h":
+				showHelp = true
+				render()
+			case "<F8>":
+				// Cycle through sort modes
+				switch sortMode {
+				case SortByCPU:
+					sortMode = SortByMem
+				case SortByMem:
+					sortMode = SortByPID
+				case SortByPID:
+					sortMode = SortByName
+				case SortByName:
+					sortMode = SortByCPU
+				}
+				render()
+			case "<F9>":
+				// Kill selected process (same as K)
+				if len(cachedProcesses) > 0 {
+					sortedProcesses := make([]Process, len(cachedProcesses))
+					copy(sortedProcesses, cachedProcesses)
+					sort.Slice(sortedProcesses, func(i, j int) bool {
+						var less bool
+						switch sortMode {
+						case SortByCPU:
+							less = sortedProcesses[i].CPU > sortedProcesses[j].CPU
+						case SortByMem:
+							less = sortedProcesses[i].Memory > sortedProcesses[j].Memory
+						case SortByPID:
+							less = sortedProcesses[i].PID < sortedProcesses[j].PID
+						case SortByName:
+							less = sortedProcesses[i].Name < sortedProcesses[j].Name
+						default:
+							less = sortedProcesses[i].CPU > sortedProcesses[j].CPU
+						}
+						if sortReverse {
+							return !less
+						}
+						return less
+					})
+					idx := scrollOffset + selectedRow - 1
+					if idx >= 0 && idx < len(sortedProcesses) {
+						pid := sortedProcesses[idx].PID
+						killProcess(pid)
+					}
+				}
+				cachedProcesses = nil
+				render()
 			case "/":
 				searchMode = true
 				searchQuery = ""
@@ -558,9 +613,6 @@ func main() {
 					searchQuery = ""
 					render()
 				}
-			case "?", "h":
-				showHelp = true
-				render()
 			case "<Resize>":
 				payload := e.Payload.(ui.Resize)
 				grid.SetRect(0, 0, payload.Width, payload.Height)
@@ -906,6 +958,12 @@ func getProcesses() []Process {
 func renderHelp(termWidth, termHeight int) {
 	helpText := ` Konrul - Help
 
+ Function Keys:
+   F1         Show this help
+   F8         Cycle sort mode (CPU→MEM→PID→NAME)
+   F9         Kill selected process
+   F10        Quit application
+
  Navigation:
    ↑/k        Scroll up
    ↓/j        Scroll down
@@ -943,8 +1001,8 @@ func renderHelp(termWidth, termHeight int) {
 	helpPara.TitleStyle.Fg = ui.ColorYellow
 
 	// Calculate centered position
-	helpWidth := 45
-	helpHeight := 32
+	helpWidth := 50
+	helpHeight := 38
 	x := (termWidth - helpWidth) / 2
 	y := (termHeight - helpHeight) / 2
 	if x < 0 {
