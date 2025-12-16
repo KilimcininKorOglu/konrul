@@ -273,7 +273,7 @@ func main() {
 	cpuCores.Title = " CPU Cores "
 	cpuCores.BorderStyle.Fg = theme.BorderColor
 	cpuCores.BarColors = theme.BarColors
-	cpuCores.NumStyles = []ui.Style{ui.NewStyle(ui.ColorBlack)}
+	cpuCores.NumFormatter = func(f float64) string { return "" } // Hide values, show only bars
 	cpuCores.LabelStyles = []ui.Style{ui.NewStyle(theme.LabelColor)}
 	cpuCores.BarWidth = 3
 	cpuCores.BarGap = 1
