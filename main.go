@@ -381,17 +381,13 @@ func main() {
 		}
 	}
 
-	// FAST initial load - skip slow GPU/Docker calls
-	cachedCPUPercent = getCPUPercent()
-	cachedCorePercents = getPerCoreCPU()
-	cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
-	cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
-	cachedSysInfoText = getSystemInfo()
-	cachedNetInfoText = getNetworkInfo()
-	cachedDiskInfoText = getDiskInfo()
-	cachedProcesses = getProcesses()
-	cachedGPUInfoText = "Detecting..."
-	cachedDockerInfoText = "Detecting..."
+	// INSTANT startup - only set defaults, first ticker will load real data
+	cachedCorePercents = make([]float64, runtime.NumCPU())
+	cachedSysInfoText = "Loading..."
+	cachedNetInfoText = "Loading..."
+	cachedDiskInfoText = "Loading..."
+	cachedGPUInfoText = "Loading..."
+	cachedDockerInfoText = "Loading..."
 
 	// render updates the UI from cached data (fast, called on keyboard events)
 	render := func() {
@@ -726,7 +722,9 @@ func main() {
 		}
 
 		processTable.Rows = rows
-		processTable.RowStyles[0] = ui.NewStyle(theme.HeaderFg, theme.HeaderBg, ui.ModifierBold)
+		if len(rows) > 0 {
+			processTable.RowStyles[0] = ui.NewStyle(theme.HeaderFg, theme.HeaderBg, ui.ModifierBold)
+		}
 
 		// Adjust selectedRow if it's out of bounds
 		if selectedRow >= len(rows) {
@@ -763,7 +761,9 @@ func main() {
 	updateSelection := func() {
 		// Clear all row styles first
 		processTable.RowStyles = make(map[int]ui.Style)
-		processTable.RowStyles[0] = ui.NewStyle(theme.HeaderFg, theme.HeaderBg, ui.ModifierBold)
+		if len(processTable.Rows) > 0 {
+			processTable.RowStyles[0] = ui.NewStyle(theme.HeaderFg, theme.HeaderBg, ui.ModifierBold)
+		}
 
 		// Highlight selected row
 		if selectedRow > 0 && selectedRow < len(processTable.Rows) {
@@ -773,8 +773,14 @@ func main() {
 		ui.Render(processTable)
 	}
 
-	// Initial render with fast-loaded data
+	// Initial render (empty UI)
 	render()
+
+	// Load data immediately in background
+	go func() {
+		collectData()
+		render()
+	}()
 
 	uiEvents := ui.PollEvents()
 	ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
