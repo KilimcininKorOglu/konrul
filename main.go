@@ -234,8 +234,8 @@ func main() {
 	processTable.RowSeparator = false
 	processTable.BorderStyle.Fg = theme.BorderColor
 	processTable.TextAlignment = ui.AlignLeft
-	// Column widths: PID(7), USER(9), CPU%(6), MEM%(6), STATE(6), COMMAND(remaining)
-	processTable.ColumnWidths = []int{7, 9, 6, 6, 6, -1}
+	// Column widths: PID(7), USER(9), CPU%(6), MEM%(6), STATE(9), COMMAND(remaining)
+	processTable.ColumnWidths = []int{7, 9, 6, 6, 9, -1}
 
 	// System Info
 	sysInfo := widgets.NewParagraph()
@@ -1233,12 +1233,48 @@ func getProcesses() []Process {
 					continue
 				}
 
-				p := Process{PID: pid, User: "-", State: "R"}
+				p := Process{PID: pid, User: "-", State: "Running"}
 
 				// Get process name only (fastest)
 				if name, err := proc.Name(); err == nil {
 					p.Name = name
 					p.Command = name
+				}
+
+				// Get username
+				if username, err := proc.Username(); err == nil {
+					// Truncate domain (DOMAIN\user -> user)
+					if idx := strings.LastIndex(username, "\\"); idx != -1 {
+						username = username[idx+1:]
+					}
+					p.User = username
+				}
+
+				// Get process status
+				if status, err := proc.Status(); err == nil && len(status) > 0 {
+					switch status[0] {
+					case "R":
+						p.State = "Running"
+					case "S":
+						p.State = "Sleeping"
+					case "D":
+						p.State = "Disk"
+					case "Z":
+						p.State = "Zombie"
+					case "T":
+						p.State = "Stopped"
+					case "I":
+						p.State = "Idle"
+					case "W":
+						p.State = "Waiting"
+					default:
+						p.State = status[0]
+					}
+				}
+
+				// Get CPU percent (needs prior sample, returns 0 on first call)
+				if cpuPct, err := proc.CPUPercent(); err == nil {
+					p.CPU = cpuPct
 				}
 
 				// Get memory percent directly
