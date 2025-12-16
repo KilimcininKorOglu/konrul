@@ -19,7 +19,7 @@ this lightweight htop-like system monitor is written in Go.
 | **GPU** | NVIDIA (nvidia-smi), AMD (rocm-smi) |
 | **Docker** | Container stats, ports, IP addresses |
 | **Processes** | List, sort, search, tree view, kill |
-| **Themes** | 6 built-in color schemes |
+| **Themes** | 4 built-in color schemes |
 | **Config** | YAML configuration file |
 
 ---
@@ -38,7 +38,7 @@ this lightweight htop-like system monitor is written in Go.
 | **Per-core CPU** | Yes | Yes |
 | **Process Tree** | Yes | Yes |
 | **Process Search** | Yes | Yes |
-| **Themes** | 6 themes | Yes |
+| **Themes** | 4 themes | Yes |
 | **Config File** | YAML | htoprc |
 | **Memory Usage** | ~15 MB | ~5 MB |
 | **Language** | Go | C |
@@ -140,13 +140,21 @@ build.bat build-all # All platforms
 
 | Key | Action |
 |:---:|:-------|
-| `d` | Toggle view: Normal > GPU > Docker |
+| `d` | Toggle view: Normal → GPU → Docker |
 | `t` | Toggle tree view (Normal only) |
 | `T` | Cycle themes |
-| `/` | Search/filter processes |
-| `Esc` | Clear search filter |
+| `/` | Enter search mode |
 | `?` / `h` | Show help |
-| `q` / `Ctrl+C` | Quit |
+| `q` / `Ctrl+C` / `F10` | Quit |
+
+### Search Mode
+
+| Key | Action |
+|:---:|:-------|
+| `Enter` | Confirm search |
+| `Esc` | Cancel search / Clear filter |
+| `Backspace` / `Delete` | Delete character |
+| Any character | Add to search query |
 
 ### Process Management
 
@@ -163,11 +171,11 @@ build.bat build-all # All platforms
 Standard process list with CPU, Memory, State information.
 
 ```
-+-- Processes [Sort:CPU%] ------------------------------------+
-| PID    USER    CPU%   MEM%   STATE   COMMAND               |
-| 1234   root    45.2   3.2    R       python train.py       |
-| 5678   www     12.1   1.8    S       nginx: worker         |
-+------------------------------------------------------------+
++-- Processes [Sort:CPU%] ------------------------------------------------+
+| PID      USER         CPU%   MEM%   STATE     COMMAND                   |
+| 1234     root         45.2   3.2    Running   python train.py           |
+| 5678     www          12.1   1.8    Sleeping  nginx: worker             |
++-------------------------------------------------------------------------+
 ```
 
 ### GPU View
@@ -175,11 +183,11 @@ Standard process list with CPU, Memory, State information.
 Press `d` to switch. Shows only GPU-using processes.
 
 ```
-+-- GPU Processes [Sort:GPU_MEM] -----------------------------+
-| PID    USER    GPU%   GPU_MEM   TYPE   COMMAND             |
-| 1234   root    45%    2.1 GB    C      python train.py     |
-| 5678   user    12%    512 MB    G      blender             |
-+------------------------------------------------------------+
++-- GPU Processes [Sort:GPU_MEM] ----------------------------------------------+
+| PID      USER         GPU%   GPU_MEM    TYPE               COMMAND          |
+| 1234     root         45%    2.1 GB     Compute            python train.py  |
+| 5678     user         12%    512 MB     Graphics           blender          |
++-----------------------------------------------------------------------------+
 ```
 
 ### Docker View
@@ -206,11 +214,11 @@ Press `d` again. Shows Docker containers with ports and IPs.
 | 0## 1#### 2### 3#      || RX:1.2G  || 65%     || [NV]    || Up: 5d   |
 | 4#### 5## 6##### 7##   || TX:856M  || R:12M/s || 45%     || Load:1.2 |
 +------------------------++----------++---------++---------++----------+
-+-- Processes [Sort:CPU%] --------------------------------------------+
-| PID     USER     CPU%    MEM%    STATE   COMMAND                    |
-| 1234    root     45.2    3.2     S       python train.py            |
-| 5678    www      12.1    1.8     S       nginx: worker process      |
-+---------------------------------------------------------------------+
++-- Processes [Sort:CPU%] ------------------------------------------------+
+| PID      USER         CPU%   MEM%   STATE     COMMAND                   |
+| 1234     root         45.2   3.2    Running   python train.py           |
+| 5678     www          12.1   1.8    Sleeping  nginx: worker process     |
++-------------------------------------------------------------------------+
  Konrul | F1:Help F8:Sort F9:Kill F10:Quit | /:Search t:Tree d:GPU/Docker
 ```
 
@@ -250,7 +258,7 @@ Config file locations:
 refresh_interval: 1
 default_sort: cpu
 tree_view: false
-theme: default  # default, dark, light, nord, dracula, solarized
+theme: default  # default, dark, light, monokai
 ```
 
 ---
@@ -262,9 +270,7 @@ theme: default  # default, dark, light, nord, dracula, solarized
 | `default` | Blue/Green on dark background |
 | `dark` | Muted colors, easy on eyes |
 | `light` | For light terminal backgrounds |
-| `nord` | Nord color palette |
-| `dracula` | Dracula theme colors |
-| `solarized` | Solarized dark colors |
+| `monokai` | Monokai-inspired colors |
 
 Press `T` to cycle through themes at runtime.
 
