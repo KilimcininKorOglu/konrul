@@ -356,7 +356,7 @@ func main() {
 
 	// collectData gathers system data based on current view mode
 	collectData := func() {
-		// Update CPU/Memory/Swap (always needed, fast)
+		// Update CPU/Memory/Swap (fast)
 		cachedCPUPercent = getCPUPercent()
 		cachedCorePercents = getPerCoreCPU()
 		cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
@@ -380,6 +380,18 @@ func main() {
 			cachedDockerInfoText = FormatDockerInfo()
 		}
 	}
+
+	// FAST initial load - skip slow GPU/Docker calls
+	cachedCPUPercent = getCPUPercent()
+	cachedCorePercents = getPerCoreCPU()
+	cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
+	cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
+	cachedSysInfoText = getSystemInfo()
+	cachedNetInfoText = getNetworkInfo()
+	cachedDiskInfoText = getDiskInfo()
+	cachedProcesses = getProcesses()
+	cachedGPUInfoText = "Detecting..."
+	cachedDockerInfoText = "Detecting..."
 
 	// render updates the UI from cached data (fast, called on keyboard events)
 	render := func() {
@@ -761,8 +773,7 @@ func main() {
 		ui.Render(processTable)
 	}
 
-	// Initial data load
-	collectData()
+	// Initial render with fast-loaded data
 	render()
 
 	uiEvents := ui.PollEvents()
