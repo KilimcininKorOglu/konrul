@@ -1,20 +1,25 @@
 // Konrul - Terminal Based System Monitor
 // Named after the mythological Turkish phoenix-like creature
 // A lightweight htop-like system monitor written in Go
+// Cross-platform support: Linux, macOS, Windows, FreeBSD
 
 package main
 
 import (
-	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v3/load"
+	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/process"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
@@ -29,50 +34,16 @@ var (
 
 // Process represents a system process
 type Process struct {
-	PID     int
+	PID     int32
 	Name    string
 	State   string
 	CPU     float64
-	Memory  float64
+	Memory  float32
 	User    string
 	Command string
 }
 
-// CPUStats holds CPU timing information
-type CPUStats struct {
-	User    uint64
-	Nice    uint64
-	System  uint64
-	Idle    uint64
-	IOWait  uint64
-	IRQ     uint64
-	SoftIRQ uint64
-	Total   uint64
-}
-
-// ProcessCPUStats holds per-process CPU timing for delta calculation
-type ProcessCPUStats struct {
-	UTime     uint64
-	STime     uint64
-	StartTime uint64
-	LastCheck time.Time
-}
-
-var (
-	prevCPUStats     CPUStats
-	prevCPUStatsInit bool
-	processCPUStats  = make(map[int]ProcessCPUStats)
-	processCPUMutex  sync.RWMutex
-	usernameCache    = make(map[string]string)
-	usernameMutex    sync.RWMutex
-	systemBootTime   uint64
-	clkTck           float64 = 100 // Usually 100 on Linux, from sysconf(_SC_CLK_TCK)
-)
-
 func main() {
-	// Get system boot time for accurate CPU calculations
-	systemBootTime = getSystemBootTime()
-
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
@@ -141,7 +112,7 @@ func main() {
 	scrollOffset := 0
 	maxVisibleRows := 15
 
-	// Cache for processes to avoid repeated filesystem reads
+	// Cache for processes
 	var cachedProcesses []Process
 	var lastProcessUpdate time.Time
 
@@ -151,7 +122,7 @@ func main() {
 		cpuGauge.Percent = int(cpuPercent)
 		cpuGauge.Label = fmt.Sprintf("%.1f%%", cpuPercent)
 
-		// Update CPU history (convert to int for sparkline)
+		// Update CPU history
 		cpuHistory = append(cpuHistory[1:], cpuPercent)
 		sparklineData := make([]float64, len(cpuHistory))
 		copy(sparklineData, cpuHistory)
@@ -174,15 +145,9 @@ func main() {
 		}
 
 		// Update System Info
-		uptime := getUptime()
-		loadAvg := getLoadAverage()
-		hostname, _ := os.Hostname()
-		sysInfo.Text = fmt.Sprintf(
-			"Hostname: %s\nUptime: %s\nLoad: %s\nProcesses: %d",
-			hostname, uptime, loadAvg, getProcessCount(),
-		)
+		sysInfo.Text = getSystemInfo()
 
-		// Update Process Table (with caching to reduce I/O)
+		// Update Process Table (with caching)
 		now := time.Now()
 		if now.Sub(lastProcessUpdate) > 500*time.Millisecond || cachedProcesses == nil {
 			cachedProcesses = getProcesses()
@@ -231,7 +196,7 @@ func main() {
 
 		for _, p := range visibleProcesses {
 			rows = append(rows, []string{
-				strconv.Itoa(p.PID),
+				strconv.Itoa(int(p.PID)),
 				truncateString(p.User, 8),
 				fmt.Sprintf("%.1f", p.CPU),
 				fmt.Sprintf("%.1f", p.Memory),
@@ -315,9 +280,7 @@ func main() {
 					idx := scrollOffset + selectedRow - 1
 					if idx >= 0 && idx < len(sortedProcesses) {
 						pid := sortedProcesses[idx].PID
-						if proc, err := os.FindProcess(pid); err == nil {
-							proc.Signal(os.Kill)
-						}
+						killProcess(pid)
 					}
 				}
 				// Force refresh after kill
@@ -332,399 +295,141 @@ func main() {
 	}
 }
 
-// getSystemBootTime reads boot time from /proc/stat
-func getSystemBootTime() uint64 {
-	file, err := os.Open("/proc/stat")
-	if err != nil {
-		return 0
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "btime ") {
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				btime, _ := strconv.ParseUint(fields[1], 10, 64)
-				return btime
-			}
-		}
-	}
-	return 0
-}
-
-// getCPUPercent calculates total CPU usage percentage using delta method
+// getCPUPercent returns total CPU usage percentage
 func getCPUPercent() float64 {
-	file, err := os.Open("/proc/stat")
-	if err != nil {
+	percentages, err := cpu.Percent(0, false)
+	if err != nil || len(percentages) == 0 {
 		return 0
 	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	var currentStats CPUStats
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "cpu ") {
-			fields := strings.Fields(line)
-			if len(fields) >= 8 {
-				currentStats.User, _ = strconv.ParseUint(fields[1], 10, 64)
-				currentStats.Nice, _ = strconv.ParseUint(fields[2], 10, 64)
-				currentStats.System, _ = strconv.ParseUint(fields[3], 10, 64)
-				currentStats.Idle, _ = strconv.ParseUint(fields[4], 10, 64)
-				currentStats.IOWait, _ = strconv.ParseUint(fields[5], 10, 64)
-				currentStats.IRQ, _ = strconv.ParseUint(fields[6], 10, 64)
-				currentStats.SoftIRQ, _ = strconv.ParseUint(fields[7], 10, 64)
-
-				currentStats.Total = currentStats.User + currentStats.Nice +
-					currentStats.System + currentStats.Idle +
-					currentStats.IOWait + currentStats.IRQ + currentStats.SoftIRQ
-			}
-			break
-		}
-	}
-
-	if !prevCPUStatsInit {
-		prevCPUStats = currentStats
-		prevCPUStatsInit = true
-		return 0
-	}
-
-	totalDelta := float64(currentStats.Total - prevCPUStats.Total)
-	idleDelta := float64(currentStats.Idle + currentStats.IOWait - prevCPUStats.Idle - prevCPUStats.IOWait)
-
-	prevCPUStats = currentStats
-
-	if totalDelta > 0 {
-		return ((totalDelta - idleDelta) / totalDelta) * 100
-	}
-	return 0
+	return percentages[0]
 }
 
-// getMemoryInfo reads memory information from /proc/meminfo
+// getMemoryInfo returns memory information
 func getMemoryInfo() (total, used uint64, percent float64) {
-	file, err := os.Open("/proc/meminfo")
+	v, err := mem.VirtualMemory()
 	if err != nil {
 		return 0, 0, 0
 	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	var memTotal, memAvailable uint64
-
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 2 {
-			continue
-		}
-		value, _ := strconv.ParseUint(fields[1], 10, 64)
-		value *= 1024 // Convert from kB to bytes
-
-		switch fields[0] {
-		case "MemTotal:":
-			memTotal = value
-		case "MemAvailable:":
-			memAvailable = value
-		}
-
-		// Early exit if we have both values
-		if memTotal > 0 && memAvailable > 0 {
-			break
-		}
-	}
-
-	used = memTotal - memAvailable
-	if memTotal > 0 {
-		percent = float64(used) / float64(memTotal) * 100
-	}
-	return memTotal, used, percent
+	return v.Total, v.Used, v.UsedPercent
 }
 
-// getSwapInfo reads swap information from /proc/meminfo
+// getSwapInfo returns swap information
 func getSwapInfo() (total, used uint64, percent float64) {
-	file, err := os.Open("/proc/meminfo")
+	v, err := mem.SwapMemory()
 	if err != nil {
 		return 0, 0, 0
 	}
-	defer file.Close()
+	return v.Total, v.Used, v.UsedPercent
+}
 
-	scanner := bufio.NewScanner(file)
-	var swapTotal, swapFree uint64
-	foundTotal, foundFree := false, false
+// getSystemInfo returns formatted system information
+func getSystemInfo() string {
+	hostname, _ := os.Hostname()
 
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 2 {
-			continue
-		}
-		value, _ := strconv.ParseUint(fields[1], 10, 64)
-		value *= 1024 // Convert from kB to bytes
-
-		switch fields[0] {
-		case "SwapTotal:":
-			swapTotal = value
-			foundTotal = true
-		case "SwapFree:":
-			swapFree = value
-			foundFree = true
-		}
-
-		// Early exit if we have both values
-		if foundTotal && foundFree {
-			break
+	// Get uptime
+	uptimeStr := "N/A"
+	if uptime, err := host.Uptime(); err == nil {
+		days := uptime / 86400
+		hours := (uptime % 86400) / 3600
+		minutes := (uptime % 3600) / 60
+		if days > 0 {
+			uptimeStr = fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
+		} else if hours > 0 {
+			uptimeStr = fmt.Sprintf("%dh %dm", hours, minutes)
+		} else {
+			uptimeStr = fmt.Sprintf("%dm", minutes)
 		}
 	}
 
-	used = swapTotal - swapFree
-	if swapTotal > 0 {
-		percent = float64(used) / float64(swapTotal) * 100
+	// Get load average (not available on Windows)
+	loadStr := "N/A"
+	if runtime.GOOS != "windows" {
+		if avg, err := load.Avg(); err == nil {
+			loadStr = fmt.Sprintf("%.2f %.2f %.2f", avg.Load1, avg.Load5, avg.Load15)
+		}
 	}
-	return swapTotal, used, percent
+
+	// Get process count
+	procCount := 0
+	if procs, err := process.Pids(); err == nil {
+		procCount = len(procs)
+	}
+
+	// Get platform info
+	platform := runtime.GOOS
+
+	return fmt.Sprintf(
+		"Hostname: %s\nUptime: %s\nLoad: %s\nProcesses: %d\nPlatform: %s",
+		hostname, uptimeStr, loadStr, procCount, platform,
+	)
 }
 
-// getUptime returns system uptime in human-readable format
-func getUptime() string {
-	data, err := os.ReadFile("/proc/uptime")
-	if err != nil {
-		return "N/A"
-	}
-
-	fields := strings.Fields(string(data))
-	if len(fields) < 1 {
-		return "N/A"
-	}
-
-	seconds, err := strconv.ParseFloat(fields[0], 64)
-	if err != nil {
-		return "N/A"
-	}
-
-	days := int(seconds) / 86400
-	hours := (int(seconds) % 86400) / 3600
-	minutes := (int(seconds) % 3600) / 60
-
-	if days > 0 {
-		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
-	}
-	if hours > 0 {
-		return fmt.Sprintf("%dh %dm", hours, minutes)
-	}
-	return fmt.Sprintf("%dm", minutes)
-}
-
-// getLoadAverage returns system load average
-func getLoadAverage() string {
-	data, err := os.ReadFile("/proc/loadavg")
-	if err != nil {
-		return "N/A"
-	}
-
-	fields := strings.Fields(string(data))
-	if len(fields) >= 3 {
-		return fmt.Sprintf("%s %s %s", fields[0], fields[1], fields[2])
-	}
-	return "N/A"
-}
-
-// getProcessCount returns total number of processes
-func getProcessCount() int {
-	dirs, _ := filepath.Glob("/proc/[0-9]*")
-	return len(dirs)
-}
-
-// getProcesses returns a list of all running processes with CPU usage
+// getProcesses returns a list of all running processes
 func getProcesses() []Process {
 	var processes []Process
 
-	dirs, err := filepath.Glob("/proc/[0-9]*")
+	ctx := context.Background()
+	pids, err := process.Pids()
 	if err != nil {
 		return processes
 	}
 
-	memTotal, _, _ := getMemoryInfo()
-	now := time.Now()
-
-	// Get total CPU time for percentage calculation
-	totalCPUTime := getTotalCPUTime()
-
-	processCPUMutex.Lock()
-	defer processCPUMutex.Unlock()
-
-	// Track which PIDs we've seen for cleanup
-	seenPIDs := make(map[int]bool)
-
-	for _, dir := range dirs {
-		pid, err := strconv.Atoi(filepath.Base(dir))
+	for _, pid := range pids {
+		proc, err := process.NewProcess(pid)
 		if err != nil {
 			continue
 		}
-		seenPIDs[pid] = true
 
-		proc := Process{PID: pid}
+		p := Process{PID: pid}
 
-		// Read process name from comm
-		if comm, err := os.ReadFile(filepath.Join(dir, "comm")); err == nil {
-			proc.Name = strings.TrimSpace(string(comm))
-			proc.Command = proc.Name
+		// Get process name
+		if name, err := proc.NameWithContext(ctx); err == nil {
+			p.Name = name
+			p.Command = name
 		}
 
-		// Read full command line
-		if cmdline, err := os.ReadFile(filepath.Join(dir, "cmdline")); err == nil {
-			cmd := strings.ReplaceAll(string(cmdline), "\x00", " ")
-			cmd = strings.TrimSpace(cmd)
-			if cmd != "" {
-				proc.Command = cmd
-			}
+		// Get command line
+		if cmdline, err := proc.CmdlineWithContext(ctx); err == nil && cmdline != "" {
+			p.Command = cmdline
 		}
 
-		// Read process status for state, uid, and memory
-		if status, err := os.Open(filepath.Join(dir, "status")); err == nil {
-			scanner := bufio.NewScanner(status)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if strings.HasPrefix(line, "State:") {
-					fields := strings.Fields(line)
-					if len(fields) >= 2 {
-						proc.State = fields[1]
-					}
-				} else if strings.HasPrefix(line, "Uid:") {
-					fields := strings.Fields(line)
-					if len(fields) >= 2 {
-						proc.User = getCachedUsername(fields[1])
-					}
-				} else if strings.HasPrefix(line, "VmRSS:") {
-					fields := strings.Fields(line)
-					if len(fields) >= 2 {
-						rss, _ := strconv.ParseUint(fields[1], 10, 64)
-						rss *= 1024 // Convert from kB to bytes
-						if memTotal > 0 {
-							proc.Memory = float64(rss) / float64(memTotal) * 100
-						}
-					}
-				}
-			}
-			status.Close()
+		// Get username
+		if username, err := proc.UsernameWithContext(ctx); err == nil {
+			p.User = username
+		} else {
+			p.User = "-"
 		}
 
-		// Read CPU time from stat and calculate percentage
-		if stat, err := os.ReadFile(filepath.Join(dir, "stat")); err == nil {
-			// Parse stat file - format: pid (comm) state ppid ...
-			// Fields 14 and 15 (1-indexed) are utime and stime
-			statStr := string(stat)
-
-			// Find the end of comm field (after the closing parenthesis)
-			commEnd := strings.LastIndex(statStr, ")")
-			if commEnd > 0 && commEnd+2 < len(statStr) {
-				fields := strings.Fields(statStr[commEnd+2:])
-				if len(fields) >= 13 {
-					utime, _ := strconv.ParseUint(fields[11], 10, 64) // 14th field (0-indexed: 11 after comm)
-					stime, _ := strconv.ParseUint(fields[12], 10, 64) // 15th field
-
-					currentCPUTime := utime + stime
-
-					// Calculate CPU percentage using delta
-					if prevStats, exists := processCPUStats[pid]; exists {
-						timeDelta := now.Sub(prevStats.LastCheck).Seconds()
-						if timeDelta > 0 && totalCPUTime > 0 {
-							cpuDelta := float64(currentCPUTime - prevStats.UTime - prevStats.STime)
-							// CPU percentage = (process CPU ticks / total CPU ticks) * 100 * num_cpus
-							// Simplified: (delta_ticks / clkTck) / time_delta * 100
-							proc.CPU = (cpuDelta / clkTck) / timeDelta * 100
-							if proc.CPU < 0 {
-								proc.CPU = 0
-							}
-							if proc.CPU > 100 {
-								proc.CPU = 100
-							}
-						}
-					}
-
-					// Update stats for next calculation
-					processCPUStats[pid] = ProcessCPUStats{
-						UTime:     utime,
-						STime:     stime,
-						LastCheck: now,
-					}
-				}
-			}
+		// Get CPU percent
+		if cpuPercent, err := proc.CPUPercentWithContext(ctx); err == nil {
+			p.CPU = cpuPercent
 		}
 
-		processes = append(processes, proc)
-	}
-
-	// Clean up old process stats
-	for pid := range processCPUStats {
-		if !seenPIDs[pid] {
-			delete(processCPUStats, pid)
+		// Get memory percent
+		if memPercent, err := proc.MemoryPercentWithContext(ctx); err == nil {
+			p.Memory = memPercent
 		}
+
+		// Get status
+		if status, err := proc.StatusWithContext(ctx); err == nil && len(status) > 0 {
+			p.State = status[0]
+		} else {
+			p.State = "-"
+		}
+
+		processes = append(processes, p)
 	}
 
 	return processes
 }
 
-// getTotalCPUTime returns total CPU time for all CPUs
-func getTotalCPUTime() uint64 {
-	file, err := os.Open("/proc/stat")
+// killProcess terminates a process by PID
+func killProcess(pid int32) {
+	proc, err := process.NewProcess(pid)
 	if err != nil {
-		return 0
+		return
 	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "cpu ") {
-			fields := strings.Fields(line)
-			if len(fields) >= 5 {
-				var total uint64
-				for i := 1; i < len(fields); i++ {
-					val, _ := strconv.ParseUint(fields[i], 10, 64)
-					total += val
-				}
-				return total
-			}
-		}
-	}
-	return 0
-}
-
-// getCachedUsername converts UID to username with caching
-func getCachedUsername(uid string) string {
-	usernameMutex.RLock()
-	if username, exists := usernameCache[uid]; exists {
-		usernameMutex.RUnlock()
-		return username
-	}
-	usernameMutex.RUnlock()
-
-	// Not in cache, look it up
-	username := lookupUsername(uid)
-
-	usernameMutex.Lock()
-	usernameCache[uid] = username
-	usernameMutex.Unlock()
-
-	return username
-}
-
-// lookupUsername reads /etc/passwd to find username for UID
-func lookupUsername(uid string) string {
-	file, err := os.Open("/etc/passwd")
-	if err != nil {
-		return uid
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		fields := strings.Split(scanner.Text(), ":")
-		if len(fields) >= 3 && fields[2] == uid {
-			return fields[0]
-		}
-	}
-	return uid
+	proc.Kill()
 }
 
 // formatBytes converts bytes to human-readable format
