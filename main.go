@@ -17,7 +17,6 @@ import (
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
-	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/process"
 
@@ -341,13 +340,8 @@ func getSystemInfo() string {
 		}
 	}
 
-	// Get load average (not available on Windows)
-	loadStr := "N/A"
-	if runtime.GOOS != "windows" {
-		if avg, err := load.Avg(); err == nil {
-			loadStr = fmt.Sprintf("%.2f %.2f %.2f", avg.Load1, avg.Load5, avg.Load15)
-		}
-	}
+	// Get load average or CPU queue length (Windows)
+	loadStr := getLoadInfo()
 
 	// Get process count
 	procCount := 0
