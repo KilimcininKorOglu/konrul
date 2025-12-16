@@ -294,6 +294,7 @@ func main() {
 	selectedRow := 1
 	scrollOffset := 0
 	maxVisibleRows := 15
+	horizontalScroll := 0 // Horizontal scroll offset for command column
 
 	// Sorting options (apply command-line defaults)
 	sortMode := getSortModeFromString(defaultSort)
@@ -702,6 +703,12 @@ func main() {
 					indent += "├─"
 					command = indent + command
 				}
+				// Apply horizontal scroll to command
+				if horizontalScroll > 0 && len(command) > horizontalScroll {
+					command = command[horizontalScroll:]
+				} else if horizontalScroll > 0 && len(command) <= horizontalScroll {
+					command = ""
+				}
 				rows = append(rows, []string{
 					strconv.Itoa(int(p.PID)),
 					truncateString(p.User, 11),
@@ -892,6 +899,17 @@ func main() {
 					scrollOffset--
 					render()
 				}
+			case "<Left>":
+				if horizontalScroll > 0 {
+					horizontalScroll -= 10
+					if horizontalScroll < 0 {
+						horizontalScroll = 0
+					}
+					render()
+				}
+			case "<Right>":
+				horizontalScroll += 10
+				render()
 			case "<Home>":
 				if scrollOffset == 0 && selectedRow == 1 {
 					// Already at top, do nothing
