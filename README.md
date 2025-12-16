@@ -18,6 +18,25 @@ this lightweight htop-like system monitor is written in Go.
 - Single binary deployment
 - Low resource consumption
 
+## Konrul vs htop
+
+| Feature | Konrul | htop |
+|---------|--------|------|
+| Cross-platform | ✅ Linux, macOS, Windows, FreeBSD | ❌ Linux, macOS, FreeBSD only |
+| Windows Support | ✅ Native | ❌ Not available |
+| Single Binary | ✅ No dependencies | ❌ Requires ncurses |
+| Per-core CPU | ✅ Bar chart | ✅ Bar graph |
+| Network I/O | ✅ Built-in | ❌ Not available |
+| Disk I/O | ✅ Built-in | ❌ Not available |
+| Process Tree | ✅ Toggle with 't' | ✅ Toggle with 't' |
+| Process Search | ✅ Real-time filter | ✅ Incremental search |
+| Kill Process | ✅ K or Delete | ✅ F9 |
+| Themes | ✅ 4 built-in themes | ✅ Color schemes |
+| Config File | ✅ YAML config | ✅ htoprc |
+| Memory Footprint | ~15 MB | ~5 MB |
+| Language | Go | C |
+| Installation | Single binary or `go install` | Package manager |
+
 ## Supported Platforms
 
 | Platform | Status | Notes |
