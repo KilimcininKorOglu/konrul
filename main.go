@@ -35,12 +35,14 @@ var (
 // Process represents a system process
 type Process struct {
 	PID     int32
+	PPID    int32
 	Name    string
 	State   string
 	CPU     float64
 	Memory  float32
 	User    string
 	Command string
+	Depth   int // Tree depth for indentation
 }
 
 // SortMode represents the process sorting mode
@@ -187,6 +189,7 @@ func main() {
 	// Sorting options
 	sortMode := SortByCPU
 	sortReverse := false
+	treeView := false
 
 	// Cache for processes
 	var cachedProcesses []Process
@@ -245,26 +248,31 @@ func main() {
 		processes := make([]Process, len(cachedProcesses))
 		copy(processes, cachedProcesses)
 
-		// Sort processes based on current sort mode
-		sort.Slice(processes, func(i, j int) bool {
-			var less bool
-			switch sortMode {
-			case SortByCPU:
-				less = processes[i].CPU > processes[j].CPU
-			case SortByMem:
-				less = processes[i].Memory > processes[j].Memory
-			case SortByPID:
-				less = processes[i].PID < processes[j].PID
-			case SortByName:
-				less = processes[i].Name < processes[j].Name
-			default:
-				less = processes[i].CPU > processes[j].CPU
-			}
-			if sortReverse {
-				return !less
-			}
-			return less
-		})
+		// Apply tree view or flat sorting
+		if treeView {
+			processes = buildProcessTree(processes)
+		} else {
+			// Sort processes based on current sort mode
+			sort.Slice(processes, func(i, j int) bool {
+				var less bool
+				switch sortMode {
+				case SortByCPU:
+					less = processes[i].CPU > processes[j].CPU
+				case SortByMem:
+					less = processes[i].Memory > processes[j].Memory
+				case SortByPID:
+					less = processes[i].PID < processes[j].PID
+				case SortByName:
+					less = processes[i].Name < processes[j].Name
+				default:
+					less = processes[i].CPU > processes[j].CPU
+				}
+				if sortReverse {
+					return !less
+				}
+				return less
+			})
+		}
 
 		// Clear old row styles
 		processTable.RowStyles = make(map[int]ui.Style)
@@ -274,7 +282,11 @@ func main() {
 		if sortReverse {
 			sortIndicator = " [R]"
 		}
-		processTable.Title = fmt.Sprintf(" Processes [c:CPU m:MEM p:PID n:NAME r:Rev] Sort:%s%s ", sortMode.String(), sortIndicator)
+		treeIndicator := ""
+		if treeView {
+			treeIndicator = " [Tree]"
+		}
+		processTable.Title = fmt.Sprintf(" Processes [c:CPU m:MEM p:PID n:NAME r:Rev t:Tree] Sort:%s%s%s ", sortMode.String(), sortIndicator, treeIndicator)
 
 		rows := [][]string{
 			{"PID", "USER", "CPU%", "MEM%", "STATE", "COMMAND"},
@@ -319,13 +331,23 @@ func main() {
 		}
 
 		for _, p := range visibleProcesses {
+			// Add tree indentation if in tree view
+			command := p.Command
+			if treeView && p.Depth > 0 {
+				indent := ""
+				for i := 0; i < p.Depth-1; i++ {
+					indent += "  "
+				}
+				indent += "├─"
+				command = indent + command
+			}
 			rows = append(rows, []string{
 				strconv.Itoa(int(p.PID)),
 				truncateString(p.User, 8),
 				fmt.Sprintf("%.1f", p.CPU),
 				fmt.Sprintf("%.1f", p.Memory),
 				p.State,
-				truncateString(p.Command, commandWidth),
+				truncateString(command, commandWidth),
 			})
 		}
 
@@ -441,6 +463,9 @@ func main() {
 				render()
 			case "r":
 				sortReverse = !sortReverse
+				render()
+			case "t":
+				treeView = !treeView
 				render()
 			}
 		case <-ticker.C:
@@ -625,6 +650,11 @@ func getProcesses() []Process {
 
 		p := Process{PID: pid}
 
+		// Get parent PID
+		if ppid, err := proc.PpidWithContext(ctx); err == nil {
+			p.PPID = ppid
+		}
+
 		// Get process name
 		if name, err := proc.NameWithContext(ctx); err == nil {
 			p.Name = name
@@ -664,6 +694,55 @@ func getProcesses() []Process {
 	}
 
 	return processes
+}
+
+// buildProcessTree builds a tree-structured list of processes
+func buildProcessTree(processes []Process) []Process {
+	// Create a map for quick lookup
+	processMap := make(map[int32]*Process)
+	for i := range processes {
+		processMap[processes[i].PID] = &processes[i]
+	}
+
+	// Find children for each process
+	children := make(map[int32][]int32)
+	var roots []int32
+	for _, p := range processes {
+		if p.PPID == 0 || processMap[p.PPID] == nil {
+			roots = append(roots, p.PID)
+		} else {
+			children[p.PPID] = append(children[p.PPID], p.PID)
+		}
+	}
+
+	// Sort roots by PID
+	sort.Slice(roots, func(i, j int) bool {
+		return roots[i] < roots[j]
+	})
+
+	// Build the tree recursively
+	var result []Process
+	var buildTree func(pid int32, depth int)
+	buildTree = func(pid int32, depth int) {
+		if p, ok := processMap[pid]; ok {
+			p.Depth = depth
+			result = append(result, *p)
+			// Sort children by PID
+			childPids := children[pid]
+			sort.Slice(childPids, func(i, j int) bool {
+				return childPids[i] < childPids[j]
+			})
+			for _, childPid := range childPids {
+				buildTree(childPid, depth+1)
+			}
+		}
+	}
+
+	for _, rootPid := range roots {
+		buildTree(rootPid, 0)
+	}
+
+	return result
 }
 
 // killProcess terminates a process by PID
