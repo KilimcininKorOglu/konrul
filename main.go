@@ -226,6 +226,11 @@ func main() {
 	diskInfo.Title = " Disk "
 	diskInfo.BorderStyle.Fg = theme.BorderColor
 
+	// GPU Info
+	gpuInfo := widgets.NewParagraph()
+	gpuInfo.Title = " GPU "
+	gpuInfo.BorderStyle.Fg = theme.BorderColor
+
 	// Per-core CPU BarChart
 	cpuCores := widgets.NewBarChart()
 	cpuCores.Title = " CPU Cores "
@@ -256,9 +261,10 @@ func main() {
 			ui.NewCol(0.34, swapGauge),
 		),
 		ui.NewRow(0.15,
-			ui.NewCol(0.40, cpuCores),
-			ui.NewCol(0.20, netInfo),
-			ui.NewCol(0.20, diskInfo),
+			ui.NewCol(0.35, cpuCores),
+			ui.NewCol(0.15, netInfo),
+			ui.NewCol(0.15, diskInfo),
+			ui.NewCol(0.15, gpuInfo),
 			ui.NewCol(0.20, sysInfo),
 		),
 		ui.NewRow(0.75, processTable),
@@ -324,6 +330,9 @@ func main() {
 
 		// Update Disk Info
 		diskInfo.Text = getDiskInfo()
+
+		// Update GPU Info
+		gpuInfo.Text = FormatGPUInfo()
 
 		// Update Process Table (with caching)
 		now := time.Now()
@@ -633,6 +642,7 @@ func main() {
 				sysInfo.BorderStyle.Fg = theme.BorderColor
 				netInfo.BorderStyle.Fg = theme.BorderColor
 				diskInfo.BorderStyle.Fg = theme.BorderColor
+				gpuInfo.BorderStyle.Fg = theme.BorderColor
 				cpuCores.BorderStyle.Fg = theme.BorderColor
 				cpuCores.BarColors = theme.BarColors
 				cpuCores.LabelStyles = []ui.Style{ui.NewStyle(theme.LabelColor)}
