@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -191,6 +192,10 @@ func main() {
 	sortReverse := false
 	treeView := false
 
+	// Search/filter options
+	searchMode := false
+	searchQuery := ""
+
 	// Cache for processes
 	var cachedProcesses []Process
 	var lastProcessUpdate time.Time
@@ -248,6 +253,11 @@ func main() {
 		processes := make([]Process, len(cachedProcesses))
 		copy(processes, cachedProcesses)
 
+		// Apply search filter
+		if searchQuery != "" {
+			processes = filterProcesses(processes, searchQuery)
+		}
+
 		// Apply tree view or flat sorting
 		if treeView {
 			processes = buildProcessTree(processes)
@@ -286,7 +296,13 @@ func main() {
 		if treeView {
 			treeIndicator = " [Tree]"
 		}
-		processTable.Title = fmt.Sprintf(" Processes [c:CPU m:MEM p:PID n:NAME r:Rev t:Tree] Sort:%s%s%s ", sortMode.String(), sortIndicator, treeIndicator)
+		if searchMode {
+			processTable.Title = fmt.Sprintf(" Search: %s_ (Enter:confirm, Esc:cancel) ", searchQuery)
+		} else if searchQuery != "" {
+			processTable.Title = fmt.Sprintf(" Processes [/:search Esc:clear] Filter:\"%s\" Sort:%s%s%s ", searchQuery, sortMode.String(), sortIndicator, treeIndicator)
+		} else {
+			processTable.Title = fmt.Sprintf(" Processes [/:search c:CPU m:MEM p:PID n:NAME r:Rev t:Tree] Sort:%s%s%s ", sortMode.String(), sortIndicator, treeIndicator)
+		}
 
 		rows := [][]string{
 			{"PID", "USER", "CPU%", "MEM%", "STATE", "COMMAND"},
@@ -379,9 +395,46 @@ func main() {
 	for {
 		select {
 		case e := <-uiEvents:
+			// Handle search mode input
+			if searchMode {
+				switch e.ID {
+				case "<Enter>":
+					searchMode = false
+					render()
+				case "<Escape>":
+					searchMode = false
+					searchQuery = ""
+					render()
+				case "<Backspace>":
+					if len(searchQuery) > 0 {
+						searchQuery = searchQuery[:len(searchQuery)-1]
+					}
+					render()
+				case "<Space>":
+					searchQuery += " "
+					render()
+				default:
+					// Add printable characters
+					if len(e.ID) == 1 {
+						searchQuery += e.ID
+						render()
+					}
+				}
+				continue
+			}
+
 			switch e.ID {
 			case "q", "<C-c>":
 				return
+			case "/":
+				searchMode = true
+				searchQuery = ""
+				render()
+			case "<Escape>":
+				if searchQuery != "" {
+					searchQuery = ""
+					render()
+				}
 			case "<Resize>":
 				payload := e.Payload.(ui.Resize)
 				grid.SetRect(0, 0, payload.Width, payload.Height)
@@ -694,6 +747,23 @@ func getProcesses() []Process {
 	}
 
 	return processes
+}
+
+// filterProcesses filters processes by search query (case-insensitive)
+func filterProcesses(processes []Process, query string) []Process {
+	query = strings.ToLower(query)
+	var filtered []Process
+	for _, p := range processes {
+		// Search in Name, Command, User, and PID
+		pidStr := strconv.Itoa(int(p.PID))
+		if strings.Contains(strings.ToLower(p.Name), query) ||
+			strings.Contains(strings.ToLower(p.Command), query) ||
+			strings.Contains(strings.ToLower(p.User), query) ||
+			strings.Contains(pidStr, query) {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
 }
 
 // buildProcessTree builds a tree-structured list of processes
