@@ -34,6 +34,240 @@ type GPUInfo struct {
 	PowerLimit    float64 // Watts
 }
 
+// GPUProcess holds information about a process using GPU
+type GPUProcess struct {
+	PID       int32
+	Name      string
+	GPUMemory uint64  // bytes
+	GPUPercent float64 // SM utilization % (NVIDIA only)
+	Type      string  // C=Compute, G=Graphics, C+G=Both
+	Vendor    GPUVendor
+}
+
+// GetGPUProcesses returns list of processes using GPU
+func GetGPUProcesses() []GPUProcess {
+	// Try NVIDIA first
+	procs := getNVIDIAGPUProcesses()
+	if len(procs) > 0 {
+		return procs
+	}
+
+	// Try AMD
+	procs = getAMDGPUProcesses()
+	if len(procs) > 0 {
+		return procs
+	}
+
+	return nil
+}
+
+// getNVIDIAGPUProcesses returns processes using NVIDIA GPU
+func getNVIDIAGPUProcesses() []GPUProcess {
+	var processes []GPUProcess
+
+	// Method 1: nvidia-smi --query-compute-apps (gets compute processes)
+	cmd := exec.Command("nvidia-smi",
+		"--query-compute-apps=pid,process_name,used_memory",
+		"--format=csv,noheader,nounits")
+
+	output, err := cmd.Output()
+	if err != nil {
+		return processes
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		parts := strings.Split(line, ", ")
+		if len(parts) < 3 {
+			parts = strings.Split(line, ",")
+		}
+		if len(parts) < 3 {
+			continue
+		}
+
+		pid, err := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 32)
+		if err != nil {
+			continue
+		}
+
+		name := strings.TrimSpace(parts[1])
+		
+		memMB, _ := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
+		memBytes := uint64(memMB * 1024 * 1024)
+
+		processes = append(processes, GPUProcess{
+			PID:       int32(pid),
+			Name:      name,
+			GPUMemory: memBytes,
+			Type:      "C", // Compute
+			Vendor:    GPUVendorNVIDIA,
+		})
+	}
+
+	// Method 2: nvidia-smi pmon for GPU utilization (optional enhancement)
+	// This gives per-process GPU % but is more complex to parse
+	pmonCmd := exec.Command("nvidia-smi", "pmon", "-c", "1", "-s", "u")
+	pmonOutput, err := pmonCmd.Output()
+	if err == nil {
+		pmonLines := strings.Split(string(pmonOutput), "\n")
+		for _, line := range pmonLines {
+			// Skip header lines (start with #)
+			if strings.HasPrefix(line, "#") || line == "" {
+				continue
+			}
+			
+			fields := strings.Fields(line)
+			if len(fields) < 4 {
+				continue
+			}
+			
+			// Fields: gpu, pid, type, sm%, mem%, enc, dec, jpg, ofa, command
+			pid, err := strconv.ParseInt(fields[1], 10, 32)
+			if err != nil || pid == 0 {
+				continue
+			}
+			
+			// Find matching process and update GPU%
+			smPercent := 0.0
+			if len(fields) > 3 && fields[3] != "-" {
+				smPercent, _ = strconv.ParseFloat(fields[3], 64)
+			}
+			
+			procType := "C"
+			if len(fields) > 2 {
+				procType = fields[2] // C, G, or C+G
+			}
+			
+			// Update existing or add new
+			found := false
+			for i := range processes {
+				if processes[i].PID == int32(pid) {
+					processes[i].GPUPercent = smPercent
+					processes[i].Type = procType
+					found = true
+					break
+				}
+			}
+			
+			if !found && smPercent > 0 {
+				// Get process name from command field
+				name := "unknown"
+				if len(fields) > 9 {
+					name = fields[9]
+				}
+				processes = append(processes, GPUProcess{
+					PID:        int32(pid),
+					Name:       name,
+					GPUPercent: smPercent,
+					Type:       procType,
+					Vendor:     GPUVendorNVIDIA,
+				})
+			}
+		}
+	}
+
+	return processes
+}
+
+// getAMDGPUProcesses returns processes using AMD GPU
+func getAMDGPUProcesses() []GPUProcess {
+	var processes []GPUProcess
+
+	// rocm-smi --showpidgpus
+	cmd := exec.Command("rocm-smi", "--showpidgpus")
+	output, err := cmd.Output()
+	if err != nil {
+		return processes
+	}
+
+	// Parse output format:
+	// GPU[0] : PID 1234 is using 2048 bytes
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, "PID") {
+			continue
+		}
+
+		// Extract PID
+		pidIdx := strings.Index(line, "PID")
+		if pidIdx == -1 {
+			continue
+		}
+		
+		// Find the number after "PID "
+		remaining := line[pidIdx+3:]
+		remaining = strings.TrimSpace(remaining)
+		
+		fields := strings.Fields(remaining)
+		if len(fields) < 1 {
+			continue
+		}
+		
+		pid, err := strconv.ParseInt(fields[0], 10, 32)
+		if err != nil {
+			continue
+		}
+
+		// Try to extract memory usage
+		var memBytes uint64
+		if strings.Contains(line, "using") {
+			usingIdx := strings.Index(line, "using")
+			if usingIdx != -1 {
+				memPart := strings.TrimSpace(line[usingIdx+5:])
+				memFields := strings.Fields(memPart)
+				if len(memFields) >= 1 {
+					mem, _ := strconv.ParseUint(memFields[0], 10, 64)
+					// Check unit
+					if len(memFields) >= 2 {
+						unit := strings.ToLower(memFields[1])
+						if strings.HasPrefix(unit, "mb") || strings.HasPrefix(unit, "mib") {
+							mem = mem * 1024 * 1024
+						} else if strings.HasPrefix(unit, "gb") || strings.HasPrefix(unit, "gib") {
+							mem = mem * 1024 * 1024 * 1024
+						} else if strings.HasPrefix(unit, "kb") || strings.HasPrefix(unit, "kib") {
+							mem = mem * 1024
+						}
+						// else assume bytes
+					}
+					memBytes = mem
+				}
+			}
+		}
+
+		// Get process name
+		name := getProcessName(int32(pid))
+
+		processes = append(processes, GPUProcess{
+			PID:       int32(pid),
+			Name:      name,
+			GPUMemory: memBytes,
+			Vendor:    GPUVendorAMD,
+		})
+	}
+
+	return processes
+}
+
+// getProcessName returns the name of a process by PID
+func getProcessName(pid int32) string {
+	// Try to get from /proc on Linux
+	// For cross-platform, we could use gopsutil but keep it simple
+	cmd := exec.Command("ps", "-p", strconv.Itoa(int(pid)), "-o", "comm=")
+	output, err := cmd.Output()
+	if err == nil {
+		name := strings.TrimSpace(string(output))
+		if name != "" {
+			return name
+		}
+	}
+	return "unknown"
+}
+
 // GetGPUInfo returns GPU information (tries NVIDIA first, then AMD)
 func GetGPUInfo() GPUInfo {
 	// Try NVIDIA first
