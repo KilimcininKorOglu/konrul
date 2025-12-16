@@ -18,6 +18,7 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 
 	ui "github.com/gizak/termui/v3"
@@ -67,6 +68,19 @@ func (s SortMode) String() string {
 	}
 }
 
+// NetworkStats holds network I/O statistics
+type NetworkStats struct {
+	BytesRecv   uint64
+	BytesSent   uint64
+	LastRecv    uint64
+	LastSent    uint64
+	RecvPerSec  uint64
+	SentPerSec  uint64
+	LastUpdate  time.Time
+}
+
+var netStats NetworkStats
+
 func main() {
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
@@ -106,6 +120,11 @@ func main() {
 	sysInfo.Title = " System "
 	sysInfo.BorderStyle.Fg = ui.ColorCyan
 
+	// Network I/O Info
+	netInfo := widgets.NewParagraph()
+	netInfo.Title = " Network "
+	netInfo.BorderStyle.Fg = ui.ColorCyan
+
 	// Per-core CPU BarChart
 	cpuCores := widgets.NewBarChart()
 	cpuCores.Title = " CPU Cores "
@@ -135,11 +154,12 @@ func main() {
 			ui.NewCol(0.33, memGauge),
 			ui.NewCol(0.34, swapGauge),
 		),
-		ui.NewRow(0.15,
-			ui.NewCol(0.6, cpuCores),
-			ui.NewCol(0.4, sysInfo),
+		ui.NewRow(0.12,
+			ui.NewCol(0.5, cpuCores),
+			ui.NewCol(0.25, netInfo),
+			ui.NewCol(0.25, sysInfo),
 		),
-		ui.NewRow(0.75, processTable),
+		ui.NewRow(0.78, processTable),
 	)
 
 	selectedRow := 1
@@ -191,6 +211,9 @@ func main() {
 		// Update System Info
 		sysInfo.Text = getSystemInfo()
 
+		// Update Network Info
+		netInfo.Text = getNetworkInfo()
+
 		// Update Process Table (with caching)
 		now := time.Now()
 		if now.Sub(lastProcessUpdate) > 500*time.Millisecond || cachedProcesses == nil {
@@ -237,10 +260,10 @@ func main() {
 		}
 
 		// Calculate visible rows based on terminal height
-		// Process table takes 75% of screen height (0.75 in grid layout)
+		// Process table takes 78% of screen height (0.78 in grid layout)
 		// Subtract 3 for: top border (1) + header row (1) + bottom border (1)
 		termWidth, termHeight = ui.TerminalDimensions()
-		processTableHeight := int(float64(termHeight) * 0.75)
+		processTableHeight := int(float64(termHeight) * 0.78)
 		maxVisibleRows = processTableHeight - 3
 		if maxVisibleRows < 5 {
 			maxVisibleRows = 5
@@ -443,6 +466,42 @@ func getSwapInfo() (total, used uint64, percent float64) {
 	return v.Total, v.Used, v.UsedPercent
 }
 
+// getNetworkInfo returns formatted network I/O information
+func getNetworkInfo() string {
+	counters, err := net.IOCounters(false) // false = aggregate all interfaces
+	if err != nil || len(counters) == 0 {
+		return "RX: N/A\nTX: N/A"
+	}
+
+	now := time.Now()
+	currentRecv := counters[0].BytesRecv
+	currentSent := counters[0].BytesSent
+
+	// Calculate per-second rates
+	if !netStats.LastUpdate.IsZero() {
+		elapsed := now.Sub(netStats.LastUpdate).Seconds()
+		if elapsed > 0 {
+			netStats.RecvPerSec = uint64(float64(currentRecv-netStats.LastRecv) / elapsed)
+			netStats.SentPerSec = uint64(float64(currentSent-netStats.LastSent) / elapsed)
+		}
+	}
+
+	// Update stats
+	netStats.BytesRecv = currentRecv
+	netStats.BytesSent = currentSent
+	netStats.LastRecv = currentRecv
+	netStats.LastSent = currentSent
+	netStats.LastUpdate = now
+
+	return fmt.Sprintf(
+		"RX: %s\nTX: %s\nRX/s: %s\nTX/s: %s",
+		formatBytes(netStats.BytesRecv),
+		formatBytes(netStats.BytesSent),
+		formatBytesPerSec(netStats.RecvPerSec),
+		formatBytesPerSec(netStats.SentPerSec),
+	)
+}
+
 // getSystemInfo returns formatted system information
 func getSystemInfo() string {
 	hostname, _ := os.Hostname()
@@ -568,6 +627,26 @@ func formatBytes(bytes uint64) string {
 		return fmt.Sprintf("%.1fK", float64(bytes)/float64(KB))
 	default:
 		return fmt.Sprintf("%dB", bytes)
+	}
+}
+
+// formatBytesPerSec converts bytes per second to human-readable format
+func formatBytesPerSec(bytes uint64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+
+	switch {
+	case bytes >= GB:
+		return fmt.Sprintf("%.1fG/s", float64(bytes)/float64(GB))
+	case bytes >= MB:
+		return fmt.Sprintf("%.1fM/s", float64(bytes)/float64(MB))
+	case bytes >= KB:
+		return fmt.Sprintf("%.1fK/s", float64(bytes)/float64(KB))
+	default:
+		return fmt.Sprintf("%dB/s", bytes)
 	}
 }
 
