@@ -11,7 +11,7 @@ this lightweight htop-like system monitor is written in Go.
 - Memory and swap usage display
 - Network I/O monitoring (RX/TX with per-second rates)
 - Disk I/O and usage monitoring
-- GPU monitoring (NVIDIA via nvidia-smi)
+- GPU monitoring (NVIDIA via nvidia-smi, AMD via rocm-smi)
 - Docker container monitoring
 - Process list with multiple sorting options (CPU, MEM, PID, NAME)
 - Process management (kill selected process)
@@ -27,7 +27,7 @@ this lightweight htop-like system monitor is written in Go.
 | Windows Support  | ✅ Native support               | ❌ Not available            |
 | Network I/O      | ✅ Built-in panel               | ❌ Not available            |
 | Disk I/O         | ✅ Built-in panel               | ❌ Not available            |
-| GPU Monitoring   | ✅ NVIDIA (nvidia-smi)          | ❌ Not available            |
+| GPU Monitoring   | ✅ NVIDIA + AMD (nvidia-smi/rocm-smi) | ❌ Not available      |
 | Docker Monitor   | ✅ Container stats              | ❌ Not available            |
 | Single Binary    | ✅ Zero dependencies            | ❌ Requires ncurses         |
 | Cross-platform   | ✅ Linux, macOS, Win, FreeBSD   | ⚠️ Linux, macOS, FreeBSD    |
@@ -283,11 +283,10 @@ go build -ldflags "-s -w \
 - [x] Theme support (4 built-in themes)
 
 ### Phase 4: Extended Monitoring (Complete)
-- [x] GPU monitoring (NVIDIA via nvidia-smi)
+- [x] GPU monitoring (NVIDIA via nvidia-smi, AMD via rocm-smi)
 - [x] Docker container monitoring
 
 ### Future Plans
-- [ ] AMD GPU monitoring (rocm-smi)
 - [ ] Kubernetes pod monitoring
 - [ ] Custom plugin system
 
