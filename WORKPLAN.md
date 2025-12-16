@@ -9,13 +9,16 @@ Her adim bir commit ile tamamlanacaktir.
 
 ### Tamamlanan Ozellikler
 - [x] CPU monitoring (toplam, gauge widget)
-- [x] CPU history (sparkline, son 50 deger)
+- [x] Per-core CPU monitoring (bar chart)
 - [x] Memory monitoring (used/total, yuzde)
 - [x] Swap monitoring (No Swap destegi)
+- [x] Network I/O monitoring (RX/TX, per-second rates)
+- [x] Disk I/O monitoring (read/write rates, usage %)
 - [x] Process listesi (PID, USER, CPU%, MEM%, STATE, COMMAND)
+- [x] Process sorting (CPU, MEM, PID, NAME, reverse)
 - [x] Process kill (K/Delete tuslari)
-- [x] Sistem bilgisi (hostname, uptime, load, process count, platform)
-- [x] Klavye kontrolleri (q, j/k, Up/Down, Home, End)
+- [x] Sistem bilgisi (uptime, load, process count)
+- [x] Klavye kontrolleri (q, j/k, Up/Down, Home, End, c/m/p/n/r)
 - [x] Responsive UI (terminal resize destegi)
 - [x] Cross-platform (Linux, macOS, Windows, FreeBSD)
 - [x] Dinamik kolon genislikleri
@@ -23,121 +26,39 @@ Her adim bir commit ile tamamlanacaktir.
 
 ---
 
-## Faz 1: MVP Tamamlama
+## Faz 1: MVP Tamamlama ✅
 
-### Adim 1.1: Per-core CPU Kullanimi
-**Commit:** "Add per-core CPU usage display"
-
-**Yapilacaklar:**
-1. `cpu.Percent(0, true)` ile her core icin CPU yuzdesini al
-2. CPU gauge'un altina veya yanina per-core gosterim ekle
-3. Secenekler:
-   - A) Her core icin mini gauge (cok yer kaplar)
-   - B) Her core icin tek satirda bar (kompakt)
-   - C) CPU panelinde core sayisi ve ortalama goster, detay icin ayri panel
-4. Onerilen: Sparkline panelini "CPU Cores" olarak degistir, her core icin mini sparkline
-
-**Dosyalar:**
-- main.go (UI layout ve render fonksiyonu)
-
-**Test:**
-- Cok cekirdekli sistemde her core'un ayri gosterildigini dogrula
-- Tek cekirdekli sistemde duzgun calistigini dogrula
+### Adim 1.1: Per-core CPU Kullanimi ✅ (Commit: 73ce671)
+- [x] Per-core CPU bar chart eklendi
+- [x] Dinamik core sayisi destegi
 
 ---
 
-## Faz 2: Genisletilmis Ozellikler
+## Faz 2: Genisletilmis Ozellikler ✅
 
-### Adim 2.1: Process Siralama Secenekleri
-**Commit:** "Add process sorting options (CPU, MEM, PID, NAME)"
+### Adim 2.1: Process Siralama Secenekleri ✅ (Commit: 077294d)
+- [x] Siralama modlari: CPU, MEM, PID, NAME
+- [x] Klavye kisayollari: c, m, p, n, r (reverse)
+- [x] Process table basliginda aktif siralama gosterimi
 
-**Yapilacaklar:**
-1. Siralama modu icin degisken ekle (cpu, mem, pid, name)
-2. Klavye kisayollari ekle:
-   - `c` - CPU'ya gore sirala (varsayilan)
-   - `m` - Memory'ye gore sirala
-   - `p` - PID'ye gore sirala
-   - `n` - Name'e gore sirala
-3. Process table basliginda aktif siralama modunu goster
-4. Ters siralama icin `r` tusu (reverse)
+### Adim 2.2: Network I/O Monitoring ✅ (Commit: 75697c6)
+- [x] RX/TX total bytes
+- [x] RX/TX per-second rates
+- [x] Network paneli eklendi
 
-**Dosyalar:**
-- main.go
+### Adim 2.3: Disk I/O ve Kullanim ✅ (Commit: 72bbe48)
+- [x] Disk usage percentage (/ veya C:)
+- [x] Read/Write per-second rates
+- [x] Disk paneli eklendi
 
-**Test:**
-- Her siralama modunun dogru calistigini dogrula
-- Ters siralamanin calistigini dogrula
-
----
-
-### Adim 2.2: Network I/O Monitoring
-**Commit:** "Add network I/O monitoring panel"
-
-**Yapilacaklar:**
-1. gopsutil/net paketini ekle
-2. Network I/O icin yeni panel olustur
-3. Gosterilecek bilgiler:
-   - Total RX (received bytes)
-   - Total TX (transmitted bytes)
-   - RX/s (bytes per second)
-   - TX/s (bytes per second)
-4. UI layout'u guncelle (System panelini genislet veya yeni satir ekle)
-5. Human-readable format (KB/s, MB/s)
-
-**Dosyalar:**
-- main.go
-- go.mod (yeni import)
-
-**Test:**
-- Network aktivitesi sirasinda degerlerin degistigini dogrula
-- Birden fazla network interface varsa toplam degerleri goster
+### Adim 2.4: UI Layout Yeniden Duzenleme ✅ (Commit: 239d295)
+- [x] Yeni layout: CPU Cores (40%) | Network (20%) | Disk (20%) | System (20%)
+- [x] Kompakt System panel
+- [x] Process table %75
 
 ---
 
-### Adim 2.3: Disk I/O ve Kullanim
-**Commit:** "Add disk I/O and usage monitoring"
-
-**Yapilacaklar:**
-1. gopsutil/disk paketini ekle
-2. Disk bilgisi icin yeni panel veya mevcut System paneline ekle
-3. Gosterilecek bilgiler:
-   - Disk kullanimi (used/total, yuzde) - root partition
-   - Read/s (bytes per second)
-   - Write/s (bytes per second)
-4. Birden fazla disk varsa toplam veya ana diski goster
-
-**Dosyalar:**
-- main.go
-- go.mod
-
-**Test:**
-- Disk I/O sirasinda degerlerin degistigini dogrula
-- Farkli platformlarda (Windows C:, Linux /) calistigini dogrula
-
----
-
-### Adim 2.4: UI Layout Yeniden Duzenleme
-**Commit:** "Reorganize UI layout for new panels"
-
-**Yapilacaklar:**
-1. Yeni layout tasarimi:
-```
-Row 1 (10%): [CPU Gauge] [Memory Gauge] [Swap Gauge]
-Row 2 (12%): [CPU Cores - mini bars veya sparklines]
-Row 3 (10%): [Network I/O] [Disk I/O] [System Info]
-Row 4 (68%): [Process Table]
-```
-2. Grid oranlarini ayarla
-3. Responsive tasarim icin minimum boyutlari kontrol et
-
-**Dosyalar:**
-- main.go
-
-**Test:**
-- Farkli terminal boyutlarinda duzgun gorunumu dogrula
-- Minimum 80x24 terminalde calistigini dogrula
-
----
+## Faz 2: Devam Eden Ozellikler
 
 ### Adim 2.5: Process Tree Gorunumu
 **Commit:** "Add process tree view toggle"
