@@ -995,14 +995,13 @@ func main() {
 				render()
 			case "d":
 				// Cycle through view modes: Normal → GPU → Docker → Normal
+				// Use cached data - no slow system calls here!
 				switch viewMode {
 				case ViewModeNormal:
-					// Try GPU view first
-					gpuInfoData := GetGPUInfo()
-					if gpuInfoData.Available {
+					// Try GPU view first (check if we have cached GPU info)
+					if cachedGPUInfoText != "" && cachedGPUInfoText != "No GPU" && !strings.HasPrefix(cachedGPUInfoText, "N/A") {
 						viewMode = ViewModeGPU
 						showDocker = false
-						cachedGPUProcesses = GetGPUProcesses()
 					} else {
 						// Skip to Docker if no GPU
 						viewMode = ViewModeDocker
