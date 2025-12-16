@@ -297,19 +297,6 @@ Press `T` to cycle through themes at runtime.
 
 ---
 
-## Roadmap
-
-| Phase                  | Status  | Features                                  |
-|------------------------|:-------:|-------------------------------------------|
-| **Phase 1: MVP**       | Done    | CPU, Memory, Swap, Process list           |
-| **Phase 2: Extended**  | Done    | Per-core CPU, Network I/O, Disk I/O, Tree |
-| **Phase 3: Advanced**  | Done    | Search, Help, Config, Themes, CLI args    |
-| **Phase 4: Monitoring**| Done    | GPU (NVIDIA/AMD), Docker containers       |
-| **Phase 5: Views**     | Done    | Context-aware process list (GPU/Docker)   |
-| **Future**             | Planned | Kubernetes pods, Plugin system            |
-
----
-
 ## License
 
 MIT License
