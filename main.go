@@ -42,6 +42,31 @@ type Process struct {
 	Command string
 }
 
+// SortMode represents the process sorting mode
+type SortMode int
+
+const (
+	SortByCPU SortMode = iota
+	SortByMem
+	SortByPID
+	SortByName
+)
+
+func (s SortMode) String() string {
+	switch s {
+	case SortByCPU:
+		return "CPU%"
+	case SortByMem:
+		return "MEM%"
+	case SortByPID:
+		return "PID"
+	case SortByName:
+		return "NAME"
+	default:
+		return "CPU%"
+	}
+}
+
 func main() {
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
@@ -121,6 +146,10 @@ func main() {
 	scrollOffset := 0
 	maxVisibleRows := 15
 
+	// Sorting options
+	sortMode := SortByCPU
+	sortReverse := false
+
 	// Cache for processes
 	var cachedProcesses []Process
 	var lastProcessUpdate time.Time
@@ -172,12 +201,36 @@ func main() {
 		processes := make([]Process, len(cachedProcesses))
 		copy(processes, cachedProcesses)
 
+		// Sort processes based on current sort mode
 		sort.Slice(processes, func(i, j int) bool {
-			return processes[i].CPU > processes[j].CPU
+			var less bool
+			switch sortMode {
+			case SortByCPU:
+				less = processes[i].CPU > processes[j].CPU
+			case SortByMem:
+				less = processes[i].Memory > processes[j].Memory
+			case SortByPID:
+				less = processes[i].PID < processes[j].PID
+			case SortByName:
+				less = processes[i].Name < processes[j].Name
+			default:
+				less = processes[i].CPU > processes[j].CPU
+			}
+			if sortReverse {
+				return !less
+			}
+			return less
 		})
 
 		// Clear old row styles
 		processTable.RowStyles = make(map[int]ui.Style)
+
+		// Update process table title with sort info
+		sortIndicator := ""
+		if sortReverse {
+			sortIndicator = " [R]"
+		}
+		processTable.Title = fmt.Sprintf(" Processes [c:CPU m:MEM p:PID n:NAME r:Rev] Sort:%s%s ", sortMode.String(), sortIndicator)
 
 		rows := [][]string{
 			{"PID", "USER", "CPU%", "MEM%", "STATE", "COMMAND"},
@@ -301,7 +354,23 @@ func main() {
 					sortedProcesses := make([]Process, len(cachedProcesses))
 					copy(sortedProcesses, cachedProcesses)
 					sort.Slice(sortedProcesses, func(i, j int) bool {
-						return sortedProcesses[i].CPU > sortedProcesses[j].CPU
+						var less bool
+						switch sortMode {
+						case SortByCPU:
+							less = sortedProcesses[i].CPU > sortedProcesses[j].CPU
+						case SortByMem:
+							less = sortedProcesses[i].Memory > sortedProcesses[j].Memory
+						case SortByPID:
+							less = sortedProcesses[i].PID < sortedProcesses[j].PID
+						case SortByName:
+							less = sortedProcesses[i].Name < sortedProcesses[j].Name
+						default:
+							less = sortedProcesses[i].CPU > sortedProcesses[j].CPU
+						}
+						if sortReverse {
+							return !less
+						}
+						return less
 					})
 
 					idx := scrollOffset + selectedRow - 1
@@ -312,6 +381,22 @@ func main() {
 				}
 				// Force refresh after kill
 				cachedProcesses = nil
+				render()
+			// Sorting keys
+			case "c":
+				sortMode = SortByCPU
+				render()
+			case "m":
+				sortMode = SortByMem
+				render()
+			case "p":
+				sortMode = SortByPID
+				render()
+			case "n":
+				sortMode = SortByName
+				render()
+			case "r":
+				sortReverse = !sortReverse
 				render()
 			}
 		case <-ticker.C:
