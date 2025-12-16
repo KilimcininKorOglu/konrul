@@ -1,0 +1,149 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            ext: ""
+          - os: linux
+            arch: arm64
+            ext: ""
+          - os: linux
+            arch: arm
+            ext: ""
+          - os: windows
+            arch: amd64
+            ext: ".exe"
+          - os: windows
+            arch: arm64
+            ext: ".exe"
+          - os: darwin
+            arch: amd64
+            ext: ""
+          - os: darwin
+            arch: arm64
+            ext: ""
+          - os: freebsd
+            arch: amd64
+            ext: ""
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          COMMIT=$(git rev-parse --short HEAD)
+          DATE=$(date -u +%Y-%m-%d_%H:%M:%S)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+        run: |
+          BINARY_NAME="konrul-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
+          LDFLAGS="-s -w -X main.version=${{ steps.version.outputs.version }} -X main.commit=${{ steps.version.outputs.commit }} -X main.date=${{ steps.version.outputs.date }}"
+          go build -ldflags "$LDFLAGS" -o "dist/$BINARY_NAME" .
+          
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: konrul-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum konrul-* > checksums.txt
+          cat checksums.txt
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Konrul ${{ steps.version.outputs.version }}
+          body: |
+            ## Konrul ${{ steps.version.outputs.version }}
+            
+            Terminal-based system monitor (htop-like) written in Go.
+            
+            ### Downloads
+            
+            | Platform | Architecture | Binary |
+            |----------|--------------|--------|
+            | Linux | amd64 | `konrul-linux-amd64` |
+            | Linux | arm64 | `konrul-linux-arm64` |
+            | Linux | arm | `konrul-linux-arm` |
+            | Windows | amd64 | `konrul-windows-amd64.exe` |
+            | Windows | arm64 | `konrul-windows-arm64.exe` |
+            | macOS | amd64 (Intel) | `konrul-darwin-amd64` |
+            | macOS | arm64 (Apple Silicon) | `konrul-darwin-arm64` |
+            | FreeBSD | amd64 | `konrul-freebsd-amd64` |
+            
+            ### Verify Downloads
+            
+            ```bash
+            sha256sum -c checksums.txt
+            ```
+            
+            ### Quick Start
+            
+            ```bash
+            # Linux/macOS/FreeBSD
+            chmod +x konrul-*
+            ./konrul-linux-amd64
+            
+            # Windows
+            konrul-windows-amd64.exe
+            ```
+          files: |
+            dist/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
