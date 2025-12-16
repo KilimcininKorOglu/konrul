@@ -7,8 +7,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
+	"os"
 	"runtime"
 	"sort"
 	"strconv"
@@ -71,6 +73,22 @@ func (s SortMode) String() string {
 	}
 }
 
+// getSortModeFromString converts a string to SortMode
+func getSortModeFromString(s string) SortMode {
+	switch strings.ToLower(s) {
+	case "cpu":
+		return SortByCPU
+	case "mem", "memory":
+		return SortByMem
+	case "pid":
+		return SortByPID
+	case "name":
+		return SortByName
+	default:
+		return SortByCPU
+	}
+}
+
 // NetworkStats holds network I/O statistics
 type NetworkStats struct {
 	BytesRecv   uint64
@@ -96,7 +114,45 @@ type DiskStats struct {
 var netStats NetworkStats
 var diskStats DiskStats
 
+// Command-line flags
+var (
+	showVersion   bool
+	refreshInterval int
+	defaultSort   string
+	startTreeView bool
+)
+
+func init() {
+	flag.BoolVar(&showVersion, "version", false, "Show version information")
+	flag.BoolVar(&showVersion, "v", false, "Show version information (shorthand)")
+	flag.IntVar(&refreshInterval, "interval", 1, "Refresh interval in seconds (1-10)")
+	flag.IntVar(&refreshInterval, "i", 1, "Refresh interval in seconds (shorthand)")
+	flag.StringVar(&defaultSort, "sort", "cpu", "Default sort mode (cpu, mem, pid, name)")
+	flag.StringVar(&defaultSort, "s", "cpu", "Default sort mode (shorthand)")
+	flag.BoolVar(&startTreeView, "tree", false, "Start in tree view mode")
+	flag.BoolVar(&startTreeView, "t", false, "Start in tree view mode (shorthand)")
+}
+
 func main() {
+	flag.Parse()
+
+	// Handle version flag
+	if showVersion {
+		fmt.Printf("Konrul %s\n", version)
+		fmt.Printf("  Commit: %s\n", commit)
+		fmt.Printf("  Built:  %s\n", date)
+		fmt.Printf("  Go:     %s\n", runtime.Version())
+		fmt.Printf("  OS/Arch: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+		os.Exit(0)
+	}
+
+	// Validate refresh interval
+	if refreshInterval < 1 {
+		refreshInterval = 1
+	} else if refreshInterval > 10 {
+		refreshInterval = 10
+	}
+
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
@@ -187,10 +243,10 @@ func main() {
 	scrollOffset := 0
 	maxVisibleRows := 15
 
-	// Sorting options
-	sortMode := SortByCPU
+	// Sorting options (apply command-line defaults)
+	sortMode := getSortModeFromString(defaultSort)
 	sortReverse := false
-	treeView := false
+	treeView := startTreeView
 
 	// Search/filter options
 	searchMode := false
@@ -395,7 +451,7 @@ func main() {
 	render()
 
 	uiEvents := ui.PollEvents()
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
 	defer ticker.Stop()
 
 	for {
