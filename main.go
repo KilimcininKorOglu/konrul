@@ -707,6 +707,16 @@ func main() {
 			processTable.RowStyles[selectedRow] = ui.NewStyle(theme.SelectionFg, theme.SelectionBg)
 		}
 
+		// Update status bar based on view mode
+		switch viewMode {
+		case ViewModeGPU:
+			statusBar.Text = " F1:Help F8:Sort F9:Kill F10:Quit | g:GPU% G:GPU_MEM | d:Docker/Normal | GPU Processes "
+		case ViewModeDocker:
+			statusBar.Text = " F1:Help F8:Sort F9:Stop F10:Quit | c:CPU m:MEM n:NAME | d:GPU/Normal | Docker Containers "
+		default:
+			statusBar.Text = " F1:Help F8:Sort F9:Kill F10:Quit | /:Search t:Tree d:GPU/Docker T:Theme "
+		}
+
 		grid.SetRect(0, 0, termWidth, termHeight)
 		ui.Render(grid)
 
@@ -1198,8 +1208,8 @@ func renderHelp(termWidth, termHeight int) {
 
  Function Keys:
    F1         Show this help
-   F8         Cycle sort mode (CPU→MEM→PID→NAME)
-   F9         Kill selected process
+   F8         Cycle sort mode
+   F9         Kill process / Stop container
    F10        Quit application
 
  Navigation:
@@ -1211,17 +1221,21 @@ func renderHelp(termWidth, termHeight int) {
  Process Management:
    K/Delete   Kill selected process
 
- Sorting:
+ Sorting (Normal View):
    c          Sort by CPU usage
    m          Sort by Memory usage
    p          Sort by PID
    n          Sort by Name
    r          Reverse sort order
 
+ Sorting (GPU View):
+   g          Sort by GPU%
+   G          Sort by GPU Memory
+
  Views:
-   t          Toggle tree view
+   d          Toggle: Normal → GPU → Docker
+   t          Toggle tree view (Normal only)
    T          Cycle themes
-   d          Toggle GPU/Docker panel
    /          Search/filter processes
    Esc        Clear search filter
 
@@ -1240,7 +1254,7 @@ func renderHelp(termWidth, termHeight int) {
 
 	// Calculate centered position
 	helpWidth := 50
-	helpHeight := 38
+	helpHeight := 44
 	x := (termWidth - helpWidth) / 2
 	y := (termHeight - helpHeight) / 2
 	if x < 0 {
