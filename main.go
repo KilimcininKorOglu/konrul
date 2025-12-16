@@ -388,8 +388,12 @@ func main() {
 		cpuGauge.Percent = int(cachedCPUPercent)
 		cpuGauge.Label = fmt.Sprintf("%.1f%%", cachedCPUPercent)
 
-		// Update Per-core CPU
-		cpuCores.Data = cachedCorePercents
+		// Update Per-core CPU (round to integers for cleaner display)
+		roundedCorePercents := make([]float64, len(cachedCorePercents))
+		for i, v := range cachedCorePercents {
+			roundedCorePercents[i] = float64(int(v + 0.5)) // Round to nearest integer
+		}
+		cpuCores.Data = roundedCorePercents
 		// Update labels if core count changed
 		if len(cachedCorePercents) != len(cpuCores.Labels) {
 			labels := make([]string, len(cachedCorePercents))
@@ -814,7 +818,7 @@ func main() {
 					searchMode = false
 					searchQuery = ""
 					render()
-				case "<Backspace>", "<C-8>", "<Delete>":
+				case "<Backspace>", "<C-8>", "<Delete>", "<C-h>":
 					if len(searchQuery) > 0 {
 						searchQuery = searchQuery[:len(searchQuery)-1]
 					}
@@ -823,9 +827,16 @@ func main() {
 					searchQuery += " "
 					render()
 				default:
-					// Add printable characters
+					// Add printable characters (and handle backspace as character code 127 or 8)
 					if len(e.ID) == 1 {
-						searchQuery += e.ID
+						ch := e.ID[0]
+						if ch == 127 || ch == 8 { // Backspace/DEL character codes
+							if len(searchQuery) > 0 {
+								searchQuery = searchQuery[:len(searchQuery)-1]
+							}
+						} else if ch >= 32 { // Printable characters
+							searchQuery += e.ID
+						}
 						render()
 					}
 				}
