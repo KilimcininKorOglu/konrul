@@ -119,6 +119,34 @@ konrul.exe
 | p | Sort by PID |
 | n | Sort by Name |
 | r | Reverse sort order |
+| t | Toggle tree view |
+| / | Search/filter processes |
+| Esc | Clear search filter |
+| ? / h | Show help screen |
+
+### Command-line Arguments
+
+```bash
+konrul [options]
+
+Options:
+  -v, --version     Show version information
+  -i, --interval N  Refresh interval in seconds (1-10, default: 1)
+  -s, --sort MODE   Default sort mode (cpu, mem, pid, name)
+  -t, --tree        Start in tree view mode
+```
+
+Examples:
+```bash
+# Show version
+konrul --version
+
+# Start with 2-second refresh interval
+konrul -i 2
+
+# Start in tree view, sorted by memory
+konrul --tree --sort mem
+```
 
 ## UI Layout
 
@@ -209,13 +237,16 @@ go build -ldflags "-s -w \
 - [x] Network I/O monitoring (RX/TX rates)
 - [x] Disk I/O and usage monitoring
 - [x] Process sorting options (CPU/MEM/PID/NAME)
-- [ ] Process tree view
+- [x] Process tree view
 
-### Phase 3: Advanced (Planned)
-- [ ] Process filtering and search
+### Phase 3: Advanced (Complete)
+- [x] Process filtering and search
+- [x] Help screen (keyboard shortcuts)
+- [x] Command-line arguments
+- [x] Configurable refresh interval
+
+### Phase 4: Future (Planned)
 - [ ] Configuration file support
-- [ ] Help screen (keyboard shortcuts)
-- [ ] Command-line arguments
 - [ ] Theme support
 - [ ] GPU monitoring (NVIDIA/AMD)
 - [ ] Docker container monitoring
