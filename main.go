@@ -1235,10 +1235,15 @@ func getProcesses() []Process {
 
 				p := Process{PID: pid, User: "-", State: "Running"}
 
-				// Get process name only (fastest)
+				// Get process name
 				if name, err := proc.Name(); err == nil {
 					p.Name = name
 					p.Command = name
+				}
+
+				// Get full command line
+				if cmdline, err := proc.Cmdline(); err == nil && cmdline != "" {
+					p.Command = cmdline
 				}
 
 				// Get username
