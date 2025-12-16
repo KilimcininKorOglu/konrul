@@ -48,7 +48,7 @@ func main() {
 	}
 	defer ui.Close()
 
-	// CPU Gauge
+	// CPU Gauge (Total)
 	cpuGauge := widgets.NewGauge()
 	cpuGauge.Title = " CPU "
 	cpuGauge.BarColor = ui.ColorGreen
@@ -81,15 +81,23 @@ func main() {
 	sysInfo.Title = " System "
 	sysInfo.BorderStyle.Fg = ui.ColorCyan
 
-	// CPU Sparkline
-	cpuSparkline := widgets.NewSparkline()
-	cpuSparkline.LineColor = ui.ColorGreen
+	// Per-core CPU BarChart
+	cpuCores := widgets.NewBarChart()
+	cpuCores.Title = " CPU Cores "
+	cpuCores.BorderStyle.Fg = ui.ColorCyan
+	cpuCores.BarColors = []ui.Color{ui.ColorGreen, ui.ColorYellow, ui.ColorRed, ui.ColorCyan, ui.ColorMagenta, ui.ColorBlue, ui.ColorWhite}
+	cpuCores.NumStyles = []ui.Style{ui.NewStyle(ui.ColorBlack)}
+	cpuCores.LabelStyles = []ui.Style{ui.NewStyle(ui.ColorCyan)}
+	cpuCores.BarWidth = 3
+	cpuCores.BarGap = 1
 
-	cpuSparklineGroup := widgets.NewSparklineGroup(cpuSparkline)
-	cpuSparklineGroup.Title = " CPU History "
-	cpuSparklineGroup.BorderStyle.Fg = ui.ColorCyan
-
-	cpuHistory := make([]float64, 50)
+	// Get initial core count
+	numCores := runtime.NumCPU()
+	coreLabels := make([]string, numCores)
+	for i := 0; i < numCores; i++ {
+		coreLabels[i] = fmt.Sprintf("%d", i)
+	}
+	cpuCores.Labels = coreLabels
 
 	// Layout
 	grid := ui.NewGrid()
@@ -97,16 +105,16 @@ func main() {
 	grid.SetRect(0, 0, termWidth, termHeight)
 
 	grid.Set(
-		ui.NewRow(0.12,
+		ui.NewRow(0.10,
 			ui.NewCol(0.33, cpuGauge),
 			ui.NewCol(0.33, memGauge),
 			ui.NewCol(0.34, swapGauge),
 		),
 		ui.NewRow(0.15,
-			ui.NewCol(0.6, cpuSparklineGroup),
+			ui.NewCol(0.6, cpuCores),
 			ui.NewCol(0.4, sysInfo),
 		),
-		ui.NewRow(0.73, processTable),
+		ui.NewRow(0.75, processTable),
 	)
 
 	selectedRow := 1
@@ -118,16 +126,22 @@ func main() {
 	var lastProcessUpdate time.Time
 
 	render := func() {
-		// Update CPU
+		// Update Total CPU
 		cpuPercent := getCPUPercent()
 		cpuGauge.Percent = int(cpuPercent)
 		cpuGauge.Label = fmt.Sprintf("%.1f%%", cpuPercent)
 
-		// Update CPU history
-		cpuHistory = append(cpuHistory[1:], cpuPercent)
-		sparklineData := make([]float64, len(cpuHistory))
-		copy(sparklineData, cpuHistory)
-		cpuSparkline.Data = sparklineData
+		// Update Per-core CPU
+		corePercents := getPerCoreCPU()
+		cpuCores.Data = corePercents
+		// Update labels if core count changed
+		if len(corePercents) != len(cpuCores.Labels) {
+			labels := make([]string, len(corePercents))
+			for i := range corePercents {
+				labels[i] = fmt.Sprintf("%d", i)
+			}
+			cpuCores.Labels = labels
+		}
 
 		// Update Memory
 		memTotal, memUsed, memPercent := getMemoryInfo()
@@ -170,10 +184,10 @@ func main() {
 		}
 
 		// Calculate visible rows based on terminal height
-		// Process table takes 73% of screen height (0.73 in grid layout)
+		// Process table takes 75% of screen height (0.75 in grid layout)
 		// Subtract 3 for: top border (1) + header row (1) + bottom border (1)
 		termWidth, termHeight = ui.TerminalDimensions()
-		processTableHeight := int(float64(termHeight) * 0.73)
+		processTableHeight := int(float64(termHeight) * 0.75)
 		maxVisibleRows = processTableHeight - 3
 		if maxVisibleRows < 5 {
 			maxVisibleRows = 5
@@ -317,6 +331,15 @@ func getCPUPercent() float64 {
 	return percentages[0]
 }
 
+// getPerCoreCPU returns CPU usage percentage for each core
+func getPerCoreCPU() []float64 {
+	percentages, err := cpu.Percent(0, true)
+	if err != nil || len(percentages) == 0 {
+		return []float64{}
+	}
+	return percentages
+}
+
 // getMemoryInfo returns memory information
 func getMemoryInfo() (total, used uint64, percent float64) {
 	v, err := mem.VirtualMemory()
@@ -363,12 +386,15 @@ func getSystemInfo() string {
 		procCount = len(procs)
 	}
 
+	// Get CPU core count
+	numCores := runtime.NumCPU()
+
 	// Get platform info
 	platform := runtime.GOOS
 
 	return fmt.Sprintf(
-		"Hostname: %s\nUptime: %s\nLoad: %s\nProcesses: %d\nPlatform: %s",
-		hostname, uptimeStr, loadStr, procCount, platform,
+		"Hostname: %s\nUptime: %s\nLoad: %s\nCores: %d\nProcesses: %d\nPlatform: %s",
+		hostname, uptimeStr, loadStr, numCores, procCount, platform,
 	)
 }
 
