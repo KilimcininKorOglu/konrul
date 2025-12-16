@@ -354,6 +354,17 @@ func main() {
 	var cachedSwapTotal, cachedSwapUsed uint64
 	var cachedSwapPercent float64
 
+	// Set initial placeholder values so UI renders immediately
+	cachedCPUPercent = 0
+	cachedCorePercents = make([]float64, runtime.NumCPU())
+	cachedMemPercent = 0
+	cachedSwapPercent = 0
+	cachedSysInfoText = "Loading..."
+	cachedNetInfoText = "Loading..."
+	cachedDiskInfoText = "Loading..."
+	cachedGPUInfoText = "Loading..."
+	cachedDockerInfoText = "Loading..."
+
 	// collectData gathers system data based on current view mode
 	collectData := func() {
 		// Update CPU/Memory/Swap (always needed, fast)
@@ -380,9 +391,6 @@ func main() {
 			cachedDockerInfoText = FormatDockerInfo()
 		}
 	}
-
-	// Initial data load (blocking, but only once)
-	collectData()
 
 	// render updates the UI from cached data (fast, called on keyboard events)
 	render := func() {
@@ -765,6 +773,12 @@ func main() {
 	}
 
 	render()
+
+	// Trigger first data load immediately in background
+	go func() {
+		collectData()
+		render()
+	}()
 
 	uiEvents := ui.PollEvents()
 	ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
