@@ -73,6 +73,8 @@ func main() {
 	processTable.RowSeparator = false
 	processTable.BorderStyle.Fg = ui.ColorCyan
 	processTable.TextAlignment = ui.AlignLeft
+	// Column widths: PID(7), USER(9), CPU%(6), MEM%(6), STATE(6), COMMAND(remaining)
+	processTable.ColumnWidths = []int{7, 9, 6, 6, 6, -1}
 
 	// System Info
 	sysInfo := widgets.NewParagraph()
@@ -196,6 +198,15 @@ func main() {
 			}
 		}
 
+		// Calculate command column width dynamically
+		// Total fixed columns: PID(7) + USER(9) + CPU%(6) + MEM%(6) + STATE(6) = 34
+		// Plus borders and padding: ~4
+		// Command gets the rest
+		commandWidth := termWidth - 34 - 4
+		if commandWidth < 20 {
+			commandWidth = 20
+		}
+
 		for _, p := range visibleProcesses {
 			rows = append(rows, []string{
 				strconv.Itoa(int(p.PID)),
@@ -203,7 +214,7 @@ func main() {
 				fmt.Sprintf("%.1f", p.CPU),
 				fmt.Sprintf("%.1f", p.Memory),
 				p.State,
-				truncateString(p.Command, 40),
+				truncateString(p.Command, commandWidth),
 			})
 		}
 
