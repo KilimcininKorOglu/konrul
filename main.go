@@ -354,17 +354,6 @@ func main() {
 	var cachedSwapTotal, cachedSwapUsed uint64
 	var cachedSwapPercent float64
 
-	// Set initial placeholder values so UI renders immediately
-	cachedCPUPercent = 0
-	cachedCorePercents = make([]float64, runtime.NumCPU())
-	cachedMemPercent = 0
-	cachedSwapPercent = 0
-	cachedSysInfoText = "Loading..."
-	cachedNetInfoText = "Loading..."
-	cachedDiskInfoText = "Loading..."
-	cachedGPUInfoText = "Loading..."
-	cachedDockerInfoText = "Loading..."
-
 	// collectData gathers system data based on current view mode
 	collectData := func() {
 		// Update CPU/Memory/Swap (always needed, fast)
@@ -772,13 +761,9 @@ func main() {
 		ui.Render(processTable)
 	}
 
+	// Initial data load
+	collectData()
 	render()
-
-	// Trigger first data load immediately in background
-	go func() {
-		collectData()
-		render()
-	}()
 
 	uiEvents := ui.PollEvents()
 	ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
@@ -1216,16 +1201,14 @@ func getSystemInfo() string {
 
 // getProcesses returns a list of all running processes (parallelized for speed)
 func getProcesses() []Process {
-	ctx := context.Background()
 	pids, err := process.Pids()
 	if err != nil {
 		return nil
 	}
 
-	// Use worker pool for parallel processing
-	numWorkers := runtime.NumCPU() * 2
-	if numWorkers > 16 {
-		numWorkers = 16
+	numWorkers := runtime.NumCPU()
+	if numWorkers > 8 {
+		numWorkers = 8
 	}
 
 	type result struct {
@@ -1246,48 +1229,17 @@ func getProcesses() []Process {
 					continue
 				}
 
-				p := Process{PID: pid, User: "-", State: "-"}
+				p := Process{PID: pid, User: "-", State: "R"}
 
-				// Get parent PID
-				if ppid, err := proc.PpidWithContext(ctx); err == nil {
-					p.PPID = ppid
-				}
-
-				// Get process name
-				if name, err := proc.NameWithContext(ctx); err == nil {
+				// Get process name only (fastest)
+				if name, err := proc.Name(); err == nil {
 					p.Name = name
 					p.Command = name
 				}
 
-				// Get command line (full path)
-				if cmdline, err := proc.CmdlineWithContext(ctx); err == nil && cmdline != "" {
-					p.Command = cmdline
-				}
-
-				// Get username (skip on Windows - very slow even with parallelization)
-				if runtime.GOOS != "windows" {
-					if username, err := proc.UsernameWithContext(ctx); err == nil {
-						p.User = username
-					}
-				}
-
-				// Get CPU percent
-				if cpuPercent, err := proc.CPUPercentWithContext(ctx); err == nil {
-					p.CPU = cpuPercent
-				}
-
-				// Get memory percent
-				if memPercent, err := proc.MemoryPercentWithContext(ctx); err == nil {
-					p.Memory = memPercent
-				}
-
-				// Get status (skip on Windows - slow)
-				if runtime.GOOS != "windows" {
-					if status, err := proc.StatusWithContext(ctx); err == nil && len(status) > 0 {
-						p.State = status[0]
-					}
-				} else {
-					p.State = "R" // Running - assume running on Windows
+				// Get memory percent directly
+				if memPct, err := proc.MemoryPercent(); err == nil {
+					p.Memory = memPct
 				}
 
 				results <- result{proc: p, ok: true}
