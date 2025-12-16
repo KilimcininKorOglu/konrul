@@ -363,6 +363,21 @@ func main() {
 	var cachedSwapPercent float64
 	var lastCPUMemUpdate time.Time
 
+	// Initialize all caches immediately at startup
+	cachedCPUPercent = getCPUPercent()
+	cachedCorePercents = getPerCoreCPU()
+	cachedMemTotal, cachedMemUsed, cachedMemPercent = getMemoryInfo()
+	cachedSwapTotal, cachedSwapUsed, cachedSwapPercent = getSwapInfo()
+	cachedSysInfoText = getSystemInfo()
+	cachedNetInfoText = getNetworkInfo()
+	cachedDiskInfoText = getDiskInfo()
+	cachedProcesses = getProcesses()
+	lastCPUMemUpdate = time.Now()
+	lastSysInfoUpdate = time.Now()
+	lastNetInfoUpdate = time.Now()
+	lastDiskInfoUpdate = time.Now()
+	lastProcessUpdate = time.Now()
+
 	render := func() {
 		now := time.Now()
 
