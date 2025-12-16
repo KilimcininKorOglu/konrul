@@ -938,24 +938,40 @@ func main() {
 				cpuCores.LabelStyles = []ui.Style{ui.NewStyle(theme.LabelColor)}
 				render()
 			case "d":
-				// Toggle between GPU and Docker panel, and update view mode
-				showDocker = !showDocker
-				if showDocker {
+				// Cycle through view modes: Normal → GPU → Docker → Normal
+				switch viewMode {
+				case ViewModeNormal:
+					// Try GPU view first
+					gpuInfoData := GetGPUInfo()
+					if gpuInfoData.Available {
+						viewMode = ViewModeGPU
+						showDocker = false
+						cachedGPUProcesses = GetGPUProcesses()
+					} else {
+						// Skip to Docker if no GPU
+						viewMode = ViewModeDocker
+						showDocker = true
+					}
+				case ViewModeGPU:
+					// Go to Docker view
 					viewMode = ViewModeDocker
-					// Reset sort mode to CPU for Docker view
+					showDocker = true
+					// Reset GPU-specific sort modes
 					if sortMode == SortByGPUMem || sortMode == SortByGPUPerc {
 						sortMode = SortByCPU
 					}
-				} else {
-					// Check if GPU is available
-					gpuInfo := GetGPUInfo()
-					if gpuInfo.Available {
-						viewMode = ViewModeGPU
-						cachedGPUProcesses = GetGPUProcesses()
-					} else {
-						viewMode = ViewModeNormal
+				case ViewModeDocker:
+					// Go back to Normal view
+					viewMode = ViewModeNormal
+					showDocker = false
+					// Reset GPU-specific sort modes
+					if sortMode == SortByGPUMem || sortMode == SortByGPUPerc {
+						sortMode = SortByCPU
 					}
 				}
+				// Reset scroll position when switching views
+				scrollOffset = 0
+				selectedRow = 1
 				updateGridLayout()
 				render()
 			case "g":
