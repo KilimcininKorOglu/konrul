@@ -460,8 +460,12 @@ func main() {
 			gpuInfo.Text = cachedGPUInfoText
 		}
 
-		// Update Process Table (with caching)
-		if now.Sub(lastProcessUpdate) > 500*time.Millisecond {
+		// Update Process Table (with caching - 1 second on Windows, 500ms on others)
+		processUpdateInterval := 500 * time.Millisecond
+		if runtime.GOOS == "windows" {
+			processUpdateInterval = 1 * time.Second
+		}
+		if now.Sub(lastProcessUpdate) > processUpdateInterval {
 			cachedProcesses = getProcesses()
 			lastProcessUpdate = now
 		}
