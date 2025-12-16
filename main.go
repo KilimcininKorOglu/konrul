@@ -491,6 +491,8 @@ func main() {
 			} else {
 				processTable.Title = fmt.Sprintf(" Docker Containers [d:Normal] Sort:%s%s ", sortMode.String(), sortIndicator)
 			}
+			// CONTAINER(30), IMAGE(25), CPU%(6), MEM(10), IP(15), PORTS(rest)
+			processTable.ColumnWidths = []int{30, 25, 6, 10, 15, -1}
 			rows = [][]string{
 				{"CONTAINER", "IMAGE", "CPU%", "MEM", "IP", "PORTS"},
 			}
@@ -649,9 +651,7 @@ func main() {
 				}
 			}
 
-			if len(dockerContainers) == 0 {
-				rows = append(rows, []string{"", "", "No", "containers", "", "found"})
-			} else {
+			if len(dockerContainers) > 0 {
 				for _, c := range visibleContainers {
 					cpu := c.CPUPerc
 					if cpu == "" {
