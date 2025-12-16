@@ -103,7 +103,7 @@ func getNVIDIAGPUProcesses() []GPUProcess {
 			PID:       int32(pid),
 			Name:      name,
 			GPUMemory: memBytes,
-			Type:      "C", // Compute
+			Type:      "G", // Graphics (most Windows apps use GPU for rendering)
 			Vendor:    GPUVendorNVIDIA,
 		})
 	}

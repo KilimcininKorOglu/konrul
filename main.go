@@ -471,7 +471,7 @@ func main() {
 			treeIndicator = " [Tree]"
 		}
 
-		// Set table title based on view mode
+		// Set table title and column widths based on view mode
 		var rows [][]string
 		switch viewMode {
 		case ViewModeGPU:
@@ -480,6 +480,8 @@ func main() {
 			} else {
 				processTable.Title = fmt.Sprintf(" GPU Processes [g:GPU%% G:GPU_MEM d:Normal] Sort:%s%s ", sortMode.String(), sortIndicator)
 			}
+			// PID(8), USER(12), GPU%(6), GPU_MEM(10), TYPE(18), COMMAND(rest)
+			processTable.ColumnWidths = []int{8, 12, 6, 10, 18, -1}
 			rows = [][]string{
 				{"PID", "USER", "GPU%", "GPU_MEM", "TYPE", "COMMAND"},
 			}
@@ -500,6 +502,8 @@ func main() {
 			} else {
 				processTable.Title = fmt.Sprintf(" Processes [/:search c:CPU m:MEM p:PID n:NAME r:Rev t:Tree d:GPU/Docker] Sort:%s%s%s ", sortMode.String(), sortIndicator, treeIndicator)
 			}
+			// PID(8), USER(12), CPU%(6), MEM%(6), STATE(9), COMMAND(rest)
+			processTable.ColumnWidths = []int{8, 12, 6, 6, 9, -1}
 			rows = [][]string{
 				{"PID", "USER", "CPU%", "MEM%", "STATE", "COMMAND"},
 			}
@@ -578,12 +582,22 @@ func main() {
 				rows = append(rows, []string{"", "", "No GPU", "processes", "", "found"})
 			} else {
 				for _, gp := range visibleGPUProcs {
+					// Convert type code to readable name
+					typeStr := gp.Type
+					switch gp.Type {
+					case "C":
+						typeStr = "Compute"
+					case "G":
+						typeStr = "Graphics"
+					case "C+G":
+						typeStr = "Compute+Graphics"
+					}
 					rows = append(rows, []string{
 						strconv.Itoa(int(gp.PID)),
 						truncateString(getProcessUser(gp.PID), 11),
 						fmt.Sprintf("%.0f%%", gp.GPUPercent),
 						formatBytes(gp.GPUMemory),
-						gp.Type,
+						typeStr,
 						truncateString(gp.Name, commandWidth),
 					})
 				}
