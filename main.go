@@ -309,7 +309,6 @@ func main() {
 
 	// Cache for GPU processes
 	var cachedGPUProcesses []GPUProcess
-	_ = cachedGPUProcesses // Will be used in render
 
 	// Function to update grid layout based on showDocker toggle
 	updateGridLayout := func() {
@@ -442,19 +441,42 @@ func main() {
 			sortIndicator = " [R]"
 		}
 		treeIndicator := ""
-		if treeView {
+		if treeView && viewMode == ViewModeNormal {
 			treeIndicator = " [Tree]"
 		}
-		if searchMode {
-			processTable.Title = fmt.Sprintf(" Search: %s_ (Enter:confirm, Esc:cancel) ", searchQuery)
-		} else if searchQuery != "" {
-			processTable.Title = fmt.Sprintf(" Processes [/:search Esc:clear] Filter:\"%s\" Sort:%s%s%s ", searchQuery, sortMode.String(), sortIndicator, treeIndicator)
-		} else {
-			processTable.Title = fmt.Sprintf(" Processes [/:search c:CPU m:MEM p:PID n:NAME r:Rev t:Tree] Sort:%s%s%s ", sortMode.String(), sortIndicator, treeIndicator)
-		}
 
-		rows := [][]string{
-			{"PID", "USER", "CPU%", "MEM%", "STATE", "COMMAND"},
+		// Set table title based on view mode
+		var rows [][]string
+		switch viewMode {
+		case ViewModeGPU:
+			if searchMode {
+				processTable.Title = fmt.Sprintf(" Search: %s_ (Enter:confirm, Esc:cancel) ", searchQuery)
+			} else {
+				processTable.Title = fmt.Sprintf(" GPU Processes [g:GPU%% G:GPU_MEM d:Normal] Sort:%s%s ", sortMode.String(), sortIndicator)
+			}
+			rows = [][]string{
+				{"PID", "USER", "GPU%", "GPU_MEM", "TYPE", "COMMAND"},
+			}
+		case ViewModeDocker:
+			if searchMode {
+				processTable.Title = fmt.Sprintf(" Search: %s_ (Enter:confirm, Esc:cancel) ", searchQuery)
+			} else {
+				processTable.Title = fmt.Sprintf(" Docker Containers [d:Normal] Sort:%s%s ", sortMode.String(), sortIndicator)
+			}
+			rows = [][]string{
+				{"CONTAINER", "IMAGE", "CPU%", "MEM", "IP", "PORTS"},
+			}
+		default:
+			if searchMode {
+				processTable.Title = fmt.Sprintf(" Search: %s_ (Enter:confirm, Esc:cancel) ", searchQuery)
+			} else if searchQuery != "" {
+				processTable.Title = fmt.Sprintf(" Processes [/:search Esc:clear] Filter:\"%s\" Sort:%s%s%s ", searchQuery, sortMode.String(), sortIndicator, treeIndicator)
+			} else {
+				processTable.Title = fmt.Sprintf(" Processes [/:search c:CPU m:MEM p:PID n:NAME r:Rev t:Tree d:GPU/Docker] Sort:%s%s%s ", sortMode.String(), sortIndicator, treeIndicator)
+			}
+			rows = [][]string{
+				{"PID", "USER", "CPU%", "MEM%", "STATE", "COMMAND"},
+			}
 		}
 
 		// Calculate visible rows based on terminal height
@@ -475,45 +497,199 @@ func main() {
 			scrollOffset = 0
 		}
 
-		visibleProcesses := processes
-		if len(processes) > maxVisibleRows {
-			end := scrollOffset + maxVisibleRows
-			if end > len(processes) {
-				end = len(processes)
+		// Render rows based on view mode
+		switch viewMode {
+		case ViewModeGPU:
+			// GPU Process view
+			gpuProcs := cachedGPUProcesses
+			if gpuProcs == nil {
+				gpuProcs = GetGPUProcesses()
+				cachedGPUProcesses = gpuProcs
 			}
-			if scrollOffset < len(processes) {
-				visibleProcesses = processes[scrollOffset:end]
-			}
-		}
 
-		// Calculate command column width dynamically
-		// Total fixed columns: PID(7) + USER(9) + CPU%(6) + MEM%(6) + STATE(6) = 34
-		// Plus borders and padding: ~4
-		// Command gets the rest
-		commandWidth := termWidth - 34 - 4
-		if commandWidth < 20 {
-			commandWidth = 20
-		}
-
-		for _, p := range visibleProcesses {
-			// Add tree indentation if in tree view
-			command := p.Command
-			if treeView && p.Depth > 0 {
-				indent := ""
-				for i := 0; i < p.Depth-1; i++ {
-					indent += "  "
+			// Sort GPU processes
+			sort.Slice(gpuProcs, func(i, j int) bool {
+				var less bool
+				switch sortMode {
+				case SortByGPUMem:
+					less = gpuProcs[i].GPUMemory > gpuProcs[j].GPUMemory
+				case SortByGPUPerc:
+					less = gpuProcs[i].GPUPercent > gpuProcs[j].GPUPercent
+				case SortByPID:
+					less = gpuProcs[i].PID < gpuProcs[j].PID
+				case SortByName:
+					less = gpuProcs[i].Name < gpuProcs[j].Name
+				default:
+					less = gpuProcs[i].GPUMemory > gpuProcs[j].GPUMemory
 				}
-				indent += "├─"
-				command = indent + command
-			}
-			rows = append(rows, []string{
-				strconv.Itoa(int(p.PID)),
-				truncateString(p.User, 8),
-				fmt.Sprintf("%.1f", p.CPU),
-				fmt.Sprintf("%.1f", p.Memory),
-				p.State,
-				truncateString(command, commandWidth),
+				if sortReverse {
+					return !less
+				}
+				return less
 			})
+
+			// Adjust scroll
+			if scrollOffset > len(gpuProcs)-maxVisibleRows {
+				scrollOffset = len(gpuProcs) - maxVisibleRows
+			}
+			if scrollOffset < 0 {
+				scrollOffset = 0
+			}
+
+			visibleGPUProcs := gpuProcs
+			if len(gpuProcs) > maxVisibleRows {
+				end := scrollOffset + maxVisibleRows
+				if end > len(gpuProcs) {
+					end = len(gpuProcs)
+				}
+				if scrollOffset < len(gpuProcs) {
+					visibleGPUProcs = gpuProcs[scrollOffset:end]
+				}
+			}
+
+			commandWidth := termWidth - 40 - 4
+			if commandWidth < 15 {
+				commandWidth = 15
+			}
+
+			if len(gpuProcs) == 0 {
+				rows = append(rows, []string{"", "", "No GPU", "processes", "", "found"})
+			} else {
+				for _, gp := range visibleGPUProcs {
+					rows = append(rows, []string{
+						strconv.Itoa(int(gp.PID)),
+						truncateString(getProcessUser(gp.PID), 8),
+						fmt.Sprintf("%.0f%%", gp.GPUPercent),
+						formatBytes(gp.GPUMemory),
+						gp.Type,
+						truncateString(gp.Name, commandWidth),
+					})
+				}
+			}
+
+		case ViewModeDocker:
+			// Docker Container view
+			dockerContainers := GetDockerInfo().Containers
+
+			// Sort containers
+			sort.Slice(dockerContainers, func(i, j int) bool {
+				var less bool
+				switch sortMode {
+				case SortByCPU:
+					cpuI := parsePercent(dockerContainers[i].CPUPerc)
+					cpuJ := parsePercent(dockerContainers[j].CPUPerc)
+					less = cpuI > cpuJ
+				case SortByMem:
+					less = dockerContainers[i].MemUsage > dockerContainers[j].MemUsage
+				case SortByName:
+					less = dockerContainers[i].Name < dockerContainers[j].Name
+				default:
+					cpuI := parsePercent(dockerContainers[i].CPUPerc)
+					cpuJ := parsePercent(dockerContainers[j].CPUPerc)
+					less = cpuI > cpuJ
+				}
+				if sortReverse {
+					return !less
+				}
+				return less
+			})
+
+			// Adjust scroll
+			if scrollOffset > len(dockerContainers)-maxVisibleRows {
+				scrollOffset = len(dockerContainers) - maxVisibleRows
+			}
+			if scrollOffset < 0 {
+				scrollOffset = 0
+			}
+
+			visibleContainers := dockerContainers
+			if len(dockerContainers) > maxVisibleRows {
+				end := scrollOffset + maxVisibleRows
+				if end > len(dockerContainers) {
+					end = len(dockerContainers)
+				}
+				if scrollOffset < len(dockerContainers) {
+					visibleContainers = dockerContainers[scrollOffset:end]
+				}
+			}
+
+			if len(dockerContainers) == 0 {
+				rows = append(rows, []string{"", "", "No", "containers", "", "found"})
+			} else {
+				for _, c := range visibleContainers {
+					cpu := c.CPUPerc
+					if cpu == "" {
+						cpu = "-"
+					}
+					mem := c.MemUsage
+					if mem == "" {
+						mem = "-"
+					}
+					ip := c.IPAddress
+					if ip == "" {
+						ip = "-"
+					}
+					ports := c.Ports
+					if ports == "" {
+						ports = "-"
+					}
+					// Truncate ports if too long
+					if len(ports) > 20 {
+						ports = ports[:17] + "..."
+					}
+					rows = append(rows, []string{
+						truncateString(c.Name, 12),
+						truncateString(c.Image, 15),
+						cpu,
+						truncateString(mem, 10),
+						ip,
+						ports,
+					})
+				}
+			}
+
+		default:
+			// Normal Process view
+			visibleProcesses := processes
+			if len(processes) > maxVisibleRows {
+				end := scrollOffset + maxVisibleRows
+				if end > len(processes) {
+					end = len(processes)
+				}
+				if scrollOffset < len(processes) {
+					visibleProcesses = processes[scrollOffset:end]
+				}
+			}
+
+			// Calculate command column width dynamically
+			// Total fixed columns: PID(7) + USER(9) + CPU%(6) + MEM%(6) + STATE(6) = 34
+			// Plus borders and padding: ~4
+			// Command gets the rest
+			commandWidth := termWidth - 34 - 4
+			if commandWidth < 20 {
+				commandWidth = 20
+			}
+
+			for _, p := range visibleProcesses {
+				// Add tree indentation if in tree view
+				command := p.Command
+				if treeView && p.Depth > 0 {
+					indent := ""
+					for i := 0; i < p.Depth-1; i++ {
+						indent += "  "
+					}
+					indent += "├─"
+					command = indent + command
+				}
+				rows = append(rows, []string{
+					strconv.Itoa(int(p.PID)),
+					truncateString(p.User, 8),
+					fmt.Sprintf("%.1f", p.CPU),
+					fmt.Sprintf("%.1f", p.Memory),
+					p.State,
+					truncateString(command, commandWidth),
+				})
+			}
 		}
 
 		processTable.Rows = rows
@@ -1202,4 +1378,30 @@ func truncateString(s string, maxLen int) string {
 		return s[:maxLen]
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// getProcessUser returns the username for a given PID
+func getProcessUser(pid int32) string {
+	ctx := context.Background()
+	p, err := process.NewProcess(pid)
+	if err != nil {
+		return "?"
+	}
+	user, err := p.UsernameWithContext(ctx)
+	if err != nil {
+		return "?"
+	}
+	// On Windows, username might be "DOMAIN\\user", extract just the user part
+	if idx := strings.LastIndex(user, "\\"); idx != -1 {
+		user = user[idx+1:]
+	}
+	return user
+}
+
+// parsePercent parses a percentage string like "2.5%" to float64
+func parsePercent(s string) float64 {
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, "%")
+	val, _ := strconv.ParseFloat(s, 64)
+	return val
 }
