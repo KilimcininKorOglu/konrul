@@ -7,7 +7,7 @@ Her adim bir commit ile tamamlanacaktir.
 
 ## Mevcut Durum
 
-### Tamamlanan Ozellikler
+### Tamamlanan Ozellikler (Faz 1-4)
 - [x] CPU monitoring (toplam, gauge widget)
 - [x] Per-core CPU monitoring (bar chart)
 - [x] Memory monitoring (used/total, yuzde)
@@ -16,387 +16,530 @@ Her adim bir commit ile tamamlanacaktir.
 - [x] Disk I/O monitoring (read/write rates, usage %)
 - [x] Process listesi (PID, USER, CPU%, MEM%, STATE, COMMAND)
 - [x] Process sorting (CPU, MEM, PID, NAME, reverse)
-- [x] Process kill (K/Delete tuslari)
+- [x] Process tree view (t tusu)
+- [x] Process search/filter (/ tusu)
+- [x] Process kill (K/Delete/F9 tuslari)
 - [x] Sistem bilgisi (uptime, load, process count)
-- [x] Klavye kontrolleri (q, j/k, Up/Down, Home, End, c/m/p/n/r)
+- [x] Klavye kontrolleri (q, j/k, Up/Down, Home, End, c/m/p/n/r, F1/F8/F9/F10)
 - [x] Responsive UI (terminal resize destegi)
 - [x] Cross-platform (Linux, macOS, Windows, FreeBSD)
 - [x] Dinamik kolon genislikleri
 - [x] Windows CPU Queue Length
+- [x] Configuration file support (YAML)
+- [x] Theme support (4 built-in themes)
+- [x] Command-line arguments (-v, -i, -s, -t, -c)
+- [x] Help screen (? veya h veya F1)
+- [x] GPU monitoring (NVIDIA nvidia-smi, AMD rocm-smi)
+- [x] Docker container monitoring (docker CLI)
+- [x] Status bar (htop-style F-key shortcuts)
+- [x] GPU/Docker panel toggle (d tusu)
 
 ---
 
-## Faz 1: MVP Tamamlama ✅
+## Faz 5: Kontekst-Duyarli Process Listesi (Yeni Ozellik)
 
-### Adim 1.1: Per-core CPU Kullanimi ✅ (Commit: 73ce671)
-- [x] Per-core CPU bar chart eklendi
-- [x] Dinamik core sayisi destegi
+Bu faz, GPU veya Docker gorunumundeyken process listesinin ilgili kaynaklara gore 
+filtrelenmesini ve ozel kolonlarla gosterilmesini icermektedir.
 
----
+### Genel Bakis
 
-## Faz 2: Genisletilmis Ozellikler ✅
+**Fikir:** 
+- GPU paneli aktifken → Process listesinde sadece GPU kullanan process'ler
+- Docker paneli aktifken → Process listesinde container'lar (veya container process'leri)
 
-### Adim 2.1: Process Siralama Secenekleri ✅ (Commit: 077294d)
-- [x] Siralama modlari: CPU, MEM, PID, NAME
-- [x] Klavye kisayollari: c, m, p, n, r (reverse)
-- [x] Process table basliginda aktif siralama gosterimi
-
-### Adim 2.2: Network I/O Monitoring ✅ (Commit: 75697c6)
-- [x] RX/TX total bytes
-- [x] RX/TX per-second rates
-- [x] Network paneli eklendi
-
-### Adim 2.3: Disk I/O ve Kullanim ✅ (Commit: 72bbe48)
-- [x] Disk usage percentage (/ veya C:)
-- [x] Read/Write per-second rates
-- [x] Disk paneli eklendi
-
-### Adim 2.4: UI Layout Yeniden Duzenleme ✅ (Commit: 239d295)
-- [x] Yeni layout: CPU Cores (40%) | Network (20%) | Disk (20%) | System (20%)
-- [x] Kompakt System panel
-- [x] Process table %75
+**Faydalar:**
+- Daha odakli izleme
+- GPU/Docker kaynak kullanimini daha iyi anlama
+- htop'tan farklilasmis, benzersiz ozellik
 
 ---
 
-## Faz 2: Devam Eden Ozellikler
+### Adim 5.1: GPU Process Listesi
 
-### Adim 2.5: Process Tree Gorunumu
-**Commit:** "Add process tree view toggle"
+**Commit:** "Add GPU process filtering when GPU panel is active"
 
-**Yapilacaklar:**
-1. Tree view modu icin degisken ekle
-2. `t` tusu ile tree/flat view arasinda gecis
-3. Tree view icin:
-   - Parent PID bilgisini al (PPID)
-   - Process'leri parent-child iliskisine gore sirala
-   - Indent ile hierarchy goster (ornek: "  |- child_process")
-4. Root process'leri (PPID=0 veya 1) en ustte goster
+#### Arastirma Sonuclari
 
-**Dosyalar:**
-- main.go
+**NVIDIA GPU (nvidia-smi):**
+```bash
+# GPU kullanan process'leri listele
+nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader,nounits
 
-**Test:**
-- Tree view'da parent-child iliskisinin dogru gosterildigini dogrula
-- Flat view'a geri donusun calistigini dogrula
+# Ornek cikti:
+# 1234, python, 2048
+# 5678, chrome, 512
 
----
+# Daha detayli (GPU kullanim yuzdesi dahil)
+nvidia-smi pmon -c 1 -s um
+# pid, type, sm%, mem%, enc, dec, command
+```
 
-## Faz 3: Ileri Duzey Ozellikler
+**AMD GPU (rocm-smi):**
+```bash
+# AMD GPU process listesi
+rocm-smi --showpidgpus
+# veya
+rocm-smi --showpids
 
-### Adim 3.1: Process Filtreleme ve Arama
-**Commit:** "Add process search and filter functionality"
+# Ornek cikti:
+# GPU[0] : PID 1234 is using 2048 MB
+```
 
-**Yapilacaklar:**
-1. Arama modu icin degisken ve input buffer ekle
-2. `/` tusu ile arama moduna gir
-3. Arama sirasinda:
-   - Alt kisimda arama kutusu goster
-   - Her karakter girisinde filtreleme yap
-   - Enter ile aramadan cik, ESC ile iptal
-4. Filtreleme kriterleri:
-   - Process name
-   - Command
-   - PID
-   - User
-5. `Escape` ile filtreyi temizle
+**Windows NVIDIA:**
+- Ayni nvidia-smi komutlari Windows'ta da calisir
+- CUDA yuklu olmali
 
-**Dosyalar:**
-- main.go
+#### Yapilacaklar
 
-**Test:**
-- Arama sonuclarinin dogru filtrelendigini dogrula
-- Buyuk/kucuk harf duyarsiz aramayi dogrula
-- Ozel karakterlerin duzgun calistigini dogrula
-
----
-
-### Adim 3.2: Config Dosyasi Destegi
-**Commit:** "Add configuration file support"
-
-**Yapilacaklar:**
-1. Config struct olustur:
+1. **gpu.go'ya yeni fonksiyon ekle:**
 ```go
-type Config struct {
-    RefreshInterval int    // saniye
-    DefaultSort     string // cpu, mem, pid, name
-    ShowTreeView    bool
-    Theme           string // default, dark, light
-    Columns         []string // gorunur kolonlar
+type GPUProcess struct {
+    PID         int32
+    Name        string
+    GPUMemory   uint64  // bytes
+    GPUPercent  float64 // SM utilization %
+    Type        string  // C=Compute, G=Graphics
+}
+
+func GetGPUProcesses() []GPUProcess {
+    // NVIDIA icin nvidia-smi --query-compute-apps
+    // AMD icin rocm-smi --showpidgpus
 }
 ```
-2. Config dosyasi konumlari:
-   - Linux/macOS: ~/.config/konrul/config.yaml
-   - Windows: %APPDATA%\konrul\config.yaml
-3. YAML parser ekle (gopkg.in/yaml.v3)
-4. Varsayilan config olustur
-5. Command-line flag ile config dosyasi belirt: `--config`
 
-**Dosyalar:**
-- main.go
-- config.go (yeni)
-- go.mod
-
-**Test:**
-- Config dosyasi yoksa varsayilan degerlerle calistigini dogrula
-- Config dosyasindaki degerlerin uygulandigini dogrula
-
----
-
-### Adim 3.3: Refresh Interval Ayari
-**Commit:** "Add configurable refresh interval"
-
-**Yapilacaklar:**
-1. Config'den refresh interval oku
-2. Command-line flag ekle: `--interval` veya `-i`
-3. Varsayilan: 1 saniye
-4. Minimum: 100ms, Maximum: 10 saniye
-5. UI'da mevcut interval'i goster (System panelinde)
-
-**Dosyalar:**
-- main.go
-- config.go
-
-**Test:**
-- Farkli interval degerlerinin calistigini dogrula
-- Cok dusuk interval'de performans sorunlarini kontrol et
-
----
-
-### Adim 3.4: Tema Destegi
-**Commit:** "Add theme support (default, dark, light, custom)"
-
-**Yapilacaklar:**
-1. Theme struct olustur:
+2. **main.go'da view mode ekle:**
 ```go
-type Theme struct {
-    CPUColor     ui.Color
-    MemoryColor  ui.Color
-    SwapColor    ui.Color
-    BorderColor  ui.Color
-    TextColor    ui.Color
-    SelectionBg  ui.Color
-    SelectionFg  ui.Color
+type ViewMode int
+const (
+    ViewModeNormal ViewMode = iota  // Tum process'ler
+    ViewModeGPU                      // Sadece GPU process'leri
+    ViewModeDocker                   // Sadece Docker container'lar
+)
+```
+
+3. **Process tablosu kolonlarini degistir:**
+   - Normal: PID, USER, CPU%, MEM%, STATE, COMMAND
+   - GPU: PID, USER, GPU%, GPU_MEM, STATE, COMMAND
+   - Docker: CONTAINER, IMAGE, CPU%, MEM%, STATUS
+
+4. **Filtreleme mantigi:**
+```go
+func filterByGPU(processes []Process, gpuProcs []GPUProcess) []Process {
+    gpuPIDs := make(map[int32]GPUProcess)
+    for _, gp := range gpuProcs {
+        gpuPIDs[gp.PID] = gp
+    }
+    
+    var filtered []Process
+    for _, p := range processes {
+        if gp, ok := gpuPIDs[p.PID]; ok {
+            p.GPUPercent = gp.GPUPercent
+            p.GPUMemory = gp.GPUMemory
+            filtered = append(filtered, p)
+        }
+    }
+    return filtered
 }
 ```
-2. Varsayilan temalar: default, dark, light
-3. Config dosyasindan tema sec
-4. `T` tusu ile tema degistir (runtime)
 
-**Dosyalar:**
-- main.go
-- theme.go (yeni)
-- config.go
-
-**Test:**
-- Tum temalarin duzgun gorunumunu dogrula
-- Tema degistirmenin aninda uygulandigini dogrula
+#### Test Senaryolari
+- [ ] NVIDIA GPU'lu sistemde GPU process'lerin dogru listelenmesi
+- [ ] AMD GPU'lu sistemde GPU process'lerin dogru listelenmesi
+- [ ] GPU olmayan sistemde bos liste veya uyari mesaji
+- [ ] GPU panelinden normal gorunume donuste tum process'lerin geri gelmesi
 
 ---
 
-### Adim 3.5: Help Ekrani
-**Commit:** "Add help screen with keyboard shortcuts"
+### Adim 5.2: Docker Container Listesi
 
-**Yapilacaklar:**
-1. `?` veya `h` tusu ile help ekrani ac
-2. Help ekraninda goster:
-   - Tum klavye kisayollari
-   - Siralama secenekleri
-   - Mevcut versiyon
-3. Herhangi bir tus ile help'ten cik
-4. Help icin popup/overlay widget kullan
+**Commit:** "Add Docker container view when Docker panel is active"
 
-**Dosyalar:**
-- main.go
+#### Arastirma Sonuclari
 
-**Test:**
-- Help ekraninin duzgun acilip kapandigini dogrula
-- Tum kisayollarin dogru listelendigini dogrula
+**Docker CLI ile Container Listesi:**
+```bash
+# Container listesi (JSON)
+docker ps -a --format '{{json .}}'
 
----
+# Container stats (CPU, MEM - JSON)
+docker stats --no-stream --format '{{json .}}'
 
-### Adim 3.6: Command-line Argumanlar
-**Commit:** "Add command-line argument support"
+# Ornek JSON:
+# {"ID":"abc123","Names":"web-app","Image":"nginx:latest","Status":"Up 2h","CPUPerc":"2.5%","MemUsage":"45MiB / 2GiB"}
+```
 
-**Yapilacaklar:**
-1. flag paketi ile argumanlar:
-   - `--version`, `-v`: Versiyon bilgisi
-   - `--help`: Kullanim bilgisi
-   - `--config`, `-c`: Config dosyasi yolu
-   - `--interval`, `-i`: Refresh interval
-   - `--sort`, `-s`: Varsayilan siralama
-   - `--tree`: Tree view ile baslat
-2. Argumanlar config dosyasini override etsin
+**Container Icindeki Process'ler:**
+```bash
+# Container'in ana PID'i (host namespace)
+docker inspect --format '{{.State.Pid}}' <container_id>
 
-**Dosyalar:**
-- main.go
+# Container icindeki tum process'ler
+docker top <container_id>
+```
 
-**Test:**
-- Tum argumanlarin calistigini dogrula
-- --help ciktisinin dogru oldugunu dogrula
-- --version ciktisinin build bilgilerini icerdigini dogrula
+**Process'in Hangi Container'a Ait Oldugunu Bulma (Linux):**
+```bash
+# /proc/<pid>/cgroup dosyasindan container ID
+cat /proc/1234/cgroup
+# Cikti: 0::/docker/<container_id>
+```
 
----
+#### Iki Yaklasim Secenegi
 
-### Adim 3.7: Docker Container Monitoring (Opsiyonel)
-**Commit:** "Add Docker container monitoring support"
+**Secenek A: Container-Centric View (Onerilen)**
+- Process listesi yerine container listesi goster
+- Her satir bir container
+- Kolonlar: CONTAINER, IMAGE, CPU%, MEM%, STATUS
 
-**Yapilacaklar:**
-1. Docker API client ekle (docker/docker/client)
-2. Container listesi icin ayri panel veya tab
-3. Gosterilecek bilgiler:
-   - Container ID
-   - Image
-   - Status
-   - CPU%
-   - Memory
-4. `d` tusu ile Docker view'a gec
-5. Docker yoksa veya erisim yoksa hata mesaji goster
+**Secenek B: Process-Centric View**
+- Mevcut process listesini filtrele
+- Sadece container icindeki process'leri goster
+- Her process'in hangi container'a ait oldugunu goster
 
-**Dosyalar:**
-- main.go
-- docker.go (yeni)
-- go.mod
+#### Yapilacaklar (Secenek A)
 
-**Test:**
-- Docker kurulu sistemde container listesini dogrula
-- Docker kurulu olmayan sistemde graceful fallback
+1. **docker.go'yu genislet:**
+```go
+type DockerContainerView struct {
+    ID       string
+    Name     string
+    Image    string
+    Status   string
+    State    string
+    CPUPerc  float64
+    MemUsage string
+    MemPerc  float64
+    Ports    string
+}
 
----
+func GetDockerContainersDetailed() []DockerContainerView {
+    // docker ps + docker stats birlestir
+}
+```
 
-### Adim 3.8: GPU Monitoring (Opsiyonel)
-**Commit:** "Add GPU monitoring support (NVIDIA)"
+2. **Yeni tablo formati:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Docker Containers [d:toggle] Sort:CPU                           │
+├──────────────┬──────────────────┬───────┬─────────┬────────────┤
+│ CONTAINER    │ IMAGE            │ CPU%  │ MEM     │ STATUS     │
+├──────────────┼──────────────────┼───────┼─────────┼────────────┤
+│ web-app      │ nginx:latest     │ 2.5%  │ 45 MB   │ Up 2 hours │
+│ database     │ postgres:15      │ 5.1%  │ 256 MB  │ Up 2 hours │
+│ redis-cache  │ redis:7-alpine   │ 0.3%  │ 12 MB   │ Up 2 hours │
+└──────────────┴──────────────────┴───────┴─────────┴────────────┘
+```
 
-**Yapilacaklar:**
-1. NVIDIA GPU icin nvidia-smi veya NVML binding
-2. GPU bilgisi icin yeni panel
-3. Gosterilecek bilgiler:
-   - GPU kullanimi %
-   - Memory kullanimi
-   - Sicaklik
-   - Fan hizi
-4. GPU yoksa paneli gizle veya "No GPU" goster
+3. **Sorting secenekleri (Docker view):**
+   - CPU%: Container CPU kullanimi
+   - MEM: Container memory kullanimi
+   - NAME: Container adi
+   - STATUS: Container durumu
 
-**Dosyalar:**
-- main.go
-- gpu.go (yeni)
-- go.mod
+4. **Container islemleri:**
+   - Kill (F9/K): `docker stop <container>`
+   - Enter: Container detaylari (opsiyonel)
 
-**Test:**
-- NVIDIA GPU'lu sistemde bilgilerin dogru gosterildigini dogrula
-- GPU olmayan sistemde graceful fallback
-
----
-
-## Faz 4: Son Rotuslari
-
-### Adim 4.1: Error Handling Iyilestirmeleri
-**Commit:** "Improve error handling and logging"
-
-**Yapilacaklar:**
-1. Tum hata durumlarini kontrol et
-2. Kullaniciya anlamli hata mesajlari goster
-3. Debug modu icin log dosyasi destegi
-4. `--debug` flagi ekle
-
-**Dosyalar:**
-- main.go
-- Tum .go dosyalari
+#### Test Senaryolari
+- [ ] Docker kurulu sistemde container listesinin dogru gosterilmesi
+- [ ] Container CPU/MEM degerlerinin guncellenmesi
+- [ ] Docker kurulu olmayan sistemde uyari mesaji
+- [ ] Bos container listesi durumu
 
 ---
 
-### Adim 4.2: Performance Optimizasyonlari
-**Commit:** "Optimize performance and reduce resource usage"
+### Adim 5.3: View Mode Gecisleri ve UI
 
-**Yapilacaklar:**
-1. Process listesi icin daha akilli caching
-2. Gereksiz render cagrilarini azalt
-3. Memory allocation'lari optimize et
-4. Profiling ile bottleneck'leri bul
+**Commit:** "Add view mode switching and update process table headers"
 
-**Dosyalar:**
-- main.go
+#### Yapilacaklar
 
-**Test:**
-- Idle durumda CPU kullanimi < 1% dogrula
-- Memory kullanimi < 20MB dogrula
+1. **View mode state yonetimi:**
+```go
+var currentViewMode ViewMode = ViewModeNormal
+
+// d tusu davranisi guncelle
+case "d":
+    if currentViewMode == ViewModeNormal {
+        if showDocker {
+            currentViewMode = ViewModeDocker
+        } else {
+            currentViewMode = ViewModeGPU
+        }
+    }
+    showDocker = !showDocker
+    if !showDocker {
+        currentViewMode = ViewModeNormal
+    }
+    updateGridLayout()
+    render()
+```
+
+2. **Process table basligini guncelle:**
+```go
+func getTableTitle(mode ViewMode, sortMode SortMode) string {
+    switch mode {
+    case ViewModeGPU:
+        return fmt.Sprintf(" GPU Processes Sort:%s ", sortMode)
+    case ViewModeDocker:
+        return fmt.Sprintf(" Docker Containers Sort:%s ", sortMode)
+    default:
+        return fmt.Sprintf(" Processes Sort:%s ", sortMode)
+    }
+}
+```
+
+3. **Kolon basliklarini degistir:**
+```go
+func getTableHeaders(mode ViewMode) []string {
+    switch mode {
+    case ViewModeGPU:
+        return []string{"PID", "USER", "GPU%", "GPU_MEM", "STATE", "COMMAND"}
+    case ViewModeDocker:
+        return []string{"CONTAINER", "IMAGE", "CPU%", "MEM", "STATUS"}
+    default:
+        return []string{"PID", "USER", "CPU%", "MEM%", "STATE", "COMMAND"}
+    }
+}
+```
+
+4. **Status bar guncelle:**
+```go
+// GPU view aktifken
+statusBar.Text = " F1:Help F8:Sort F9:Kill F10:Quit | d:Normal View | GPU Processes "
+
+// Docker view aktifken
+statusBar.Text = " F1:Help F8:Sort F9:Stop F10:Quit | d:Normal View | Docker Containers "
+```
+
+#### UI Mockup
+
+**Normal View:**
+```
+┌─ CPU ──────┐┌─ Memory ───┐┌─ Swap ─────┐
+│ ████░ 45%  ││ ███░░ 62%  ││ █░░░░ 15%  │
+└────────────┘└────────────┘└────────────┘
+┌─ CPU Cores ────────────┐┌─ Net ─┐┌─ Disk ┐┌─ GPU ──┐┌─ System ─┐
+│ 0██ 1█░ 2███ 3█░ 4██░  ││ RX:.. ││ R:... ││ [NV]   ││ Host:... │
+└────────────────────────┘└───────┘└───────┘└────────┘└──────────┘
+┌─ Processes [Sort:CPU] ─────────────────────────────────────────┐
+│ PID    USER    CPU%   MEM%   STATE   COMMAND                   │
+│ 1234   root    45.2   12.3   R       python train.py           │
+│ ...                                                            │
+└────────────────────────────────────────────────────────────────┘
+ F1:Help F8:Sort F9:Kill F10:Quit | /:Search t:Tree d:GPU/Docker
+```
+
+**GPU View (d ile gecis):**
+```
+┌─ CPU ──────┐┌─ Memory ───┐┌─ Swap ─────┐
+│ ████░ 45%  ││ ███░░ 62%  ││ █░░░░ 15%  │
+└────────────┘└────────────┘└────────────┘
+┌─ CPU Cores ────────────┐┌─ Net ─┐┌─ Disk ┐┌─ GPU ──┐┌─ System ─┐
+│ 0██ 1█░ 2███ 3█░ 4██░  ││ RX:.. ││ R:... ││ [NV]   ││ Host:... │
+│                        ││       ││       ││ 45%    ││          │
+└────────────────────────┘└───────┘└───────┘└────────┘└──────────┘
+┌─ GPU Processes [nvidia-smi] Sort:GPU_MEM ──────────────────────┐
+│ PID    USER    GPU%   GPU_MEM   STATE   COMMAND                │
+│ 1234   root    45%    2.1 GB    R       python train.py        │
+│ 5678   user    12%    512 MB    R       blender --gpu          │
+└────────────────────────────────────────────────────────────────┘
+ F1:Help F8:Sort F9:Kill F10:Quit | d:Normal View | GPU Processes
+```
+
+**Docker View (d ile gecis):**
+```
+┌─ CPU ──────┐┌─ Memory ───┐┌─ Swap ─────┐
+│ ████░ 45%  ││ ███░░ 62%  ││ █░░░░ 15%  │
+└────────────┘└────────────┘└────────────┘
+┌─ CPU Cores ────────────┐┌─ Net ─┐┌─ Disk ┐┌─Docker─┐┌─ System ─┐
+│ 0██ 1█░ 2███ 3█░ 4██░  ││ RX:.. ││ R:... ││ Run: 3 ││ Host:... │
+│                        ││       ││       ││ Stop:1 ││          │
+└────────────────────────┘└───────┘└───────┘└────────┘└──────────┘
+┌─ Docker Containers Sort:CPU ───────────────────────────────────┐
+│ CONTAINER    IMAGE              CPU%    MEM      STATUS        │
+│ web-app      nginx:latest       2.5%    45 MB    Up 2 hours    │
+│ database     postgres:15        5.1%    256 MB   Up 2 hours    │
+│ redis        redis:7-alpine     0.3%    12 MB    Up 2 hours    │
+└────────────────────────────────────────────────────────────────┘
+ F1:Help F8:Sort F9:Stop F10:Quit | d:Normal View | Docker View
+```
 
 ---
 
-### Adim 4.3: README ve Dokumantasyon Guncellemesi
-**Commit:** "Update documentation for all new features"
+### Adim 5.4: Platform Uyumlulugu
 
-**Yapilacaklar:**
-1. README.md'yi tum yeni ozelliklerle guncelle
-2. Klavye kisayollari tablosunu guncelle
-3. Config dosyasi ornegi ekle
-4. Ekran goruntuleri ekle (opsiyonel)
+**Commit:** "Add cross-platform support for GPU/Docker process views"
 
-**Dosyalar:**
-- README.md
-- CONFIG.md (yeni - config dokumantasyonu)
+#### Platform Ozellikleri
 
----
+| Ozellik | Linux | macOS | Windows | FreeBSD |
+|---------|-------|-------|---------|---------|
+| NVIDIA GPU Process | ✅ nvidia-smi | ✅ nvidia-smi | ✅ nvidia-smi | ❌ |
+| AMD GPU Process | ✅ rocm-smi | ❌ | ❌ | ❌ |
+| Docker Containers | ✅ | ✅ | ✅ | ✅ |
+| Container PID Map | ✅ /proc/cgroup | ⚠️ Limited | ⚠️ Limited | ⚠️ Limited |
 
-### Adim 4.4: Final Test ve Release Hazirligi
-**Commit:** "Prepare for v1.0.0 release"
+#### Yapilacaklar
 
-**Yapilacaklar:**
-1. Tum platformlarda test et
-2. CHANGELOG.md olustur
-3. LICENSE dosyasini kontrol et
-4. Git tag olustur: v1.0.0
-5. Release binary'leri olustur
+1. **Build tag'leri ile platform-specific kod:**
+```go
+// gpu_nvidia.go
+// +build linux windows darwin
 
-**Dosyalar:**
-- CHANGELOG.md (yeni)
-- Tum binary'ler (bin/)
+// gpu_amd.go  
+// +build linux
 
----
+// docker_linux.go
+// +build linux
 
-## Commit Sirasi Ozeti
+// docker_windows.go
+// +build windows
+```
 
-| # | Commit | Faz |
-|---|--------|-----|
-| 1 | Add per-core CPU usage display | 1.1 |
-| 2 | Add process sorting options | 2.1 |
-| 3 | Add network I/O monitoring panel | 2.2 |
-| 4 | Add disk I/O and usage monitoring | 2.3 |
-| 5 | Reorganize UI layout for new panels | 2.4 |
-| 6 | Add process tree view toggle | 2.5 |
-| 7 | Add process search and filter functionality | 3.1 |
-| 8 | Add configuration file support | 3.2 |
-| 9 | Add configurable refresh interval | 3.3 |
-| 10 | Add theme support | 3.4 |
-| 11 | Add help screen with keyboard shortcuts | 3.5 |
-| 12 | Add command-line argument support | 3.6 |
-| 13 | Add Docker container monitoring support | 3.7 (opsiyonel) |
-| 14 | Add GPU monitoring support | 3.8 (opsiyonel) |
-| 15 | Improve error handling and logging | 4.1 |
-| 16 | Optimize performance | 4.2 |
-| 17 | Update documentation | 4.3 |
-| 18 | Prepare for v1.0.0 release | 4.4 |
+2. **Graceful fallback:**
+```go
+func GetGPUProcesses() ([]GPUProcess, error) {
+    procs, err := getNVIDIAProcesses()
+    if err == nil && len(procs) > 0 {
+        return procs, nil
+    }
+    
+    procs, err = getAMDProcesses()
+    if err == nil && len(procs) > 0 {
+        return procs, nil
+    }
+    
+    return nil, fmt.Errorf("no GPU processes available")
+}
+```
 
 ---
 
-## Notlar
+### Adim 5.5: Sorting ve Navigasyon
 
-- Her commit sonrasi `build.bat build-all` ile tum platformlarda build alinacak
-- Her commit sonrasi manual test yapilacak
-- Buyuk degisiklikler icin branch olusturulabilir
-- Opsiyonel ozellikler (Docker, GPU) proje sahibinin tercihine bagli
+**Commit:** "Add view-specific sorting and navigation"
+
+#### Yapilacaklar
+
+1. **GPU view sorting:**
+   - g: Sort by GPU%
+   - G: Sort by GPU Memory
+   - c: Sort by CPU% (mevcut)
+   - m: Sort by MEM% (mevcut)
+
+2. **Docker view sorting:**
+   - c: Sort by CPU%
+   - m: Sort by Memory
+   - n: Sort by Name
+   - s: Sort by Status
+
+3. **Kill/Stop davranisi:**
+   - Normal view: `kill -9 <pid>`
+   - GPU view: `kill -9 <pid>`
+   - Docker view: `docker stop <container>`
 
 ---
 
-## Tahmini Sure
+## Implementasyon Sirasi
 
-| Faz | Sure |
-|-----|------|
-| Faz 1 (MVP Tamamlama) | 1-2 saat |
-| Faz 2 (Genisletilmis) | 3-4 saat |
-| Faz 3 (Ileri Duzey) | 4-6 saat |
-| Faz 4 (Son Rotuslar) | 2-3 saat |
-| **Toplam** | **10-15 saat** |
+| # | Adim | Oncelik | Tahmini Sure |
+|---|------|---------|--------------|
+| 1 | GPU Process Listesi (NVIDIA) | Yuksek | 2-3 saat |
+| 2 | GPU Process Listesi (AMD) | Orta | 1-2 saat |
+| 3 | Docker Container View | Yuksek | 2-3 saat |
+| 4 | View Mode UI Degisiklikleri | Yuksek | 1-2 saat |
+| 5 | Platform Uyumlulugu | Orta | 1-2 saat |
+| 6 | Sorting ve Navigasyon | Dusuk | 1 saat |
+| **Toplam** | | | **8-13 saat** |
 
 ---
 
-*Bu dokuman, gelistirme surecinde guncellenecektir.*
+## Teknik Notlar
+
+### nvidia-smi Komutlari
+
+```bash
+# Process listesi (basit)
+nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader,nounits
+
+# Process listesi (detayli - GPU % dahil)
+nvidia-smi pmon -c 1 -s um
+# Cikti: idx, pid, type, sm, mem, enc, dec, command
+
+# Sadece PID'ler
+nvidia-smi --query-compute-apps=pid --format=csv,noheader
+```
+
+### rocm-smi Komutlari
+
+```bash
+# Process listesi
+rocm-smi --showpidgpus
+
+# Alternatif
+rocm-smi --showpids
+```
+
+### Docker Komutlari
+
+```bash
+# Container listesi (JSON)
+docker ps -a --format '{{json .}}'
+
+# Container stats (JSON, tek seferlik)
+docker stats --no-stream --format '{{json .}}'
+
+# Container ana PID
+docker inspect --format '{{.State.Pid}}' <container>
+```
+
+---
+
+## Riskler ve Cozumler
+
+| Risk | Etki | Cozum |
+|------|------|-------|
+| nvidia-smi yok | GPU view calismaz | Uyari mesaji goster, normal view'a don |
+| rocm-smi yok | AMD GPU view calismaz | Uyari mesaji goster |
+| Docker yok | Docker view calismaz | Uyari mesaji goster, normal view'a don |
+| GPU process yok | Bos liste | "No GPU processes" mesaji |
+| Container yok | Bos liste | "No containers running" mesaji |
+| Izin hatasi | Komut calistiramaz | Uyari mesaji, graceful fallback |
+
+---
+
+## Eski Fazlar (Tamamlandi)
+
+<details>
+<summary>Faz 1-4 Detaylari (Tamamlandi)</summary>
+
+### Faz 1: MVP Tamamlama ✅
+- Per-core CPU bar chart
+
+### Faz 2: Genisletilmis Ozellikler ✅
+- Process sorting
+- Network I/O
+- Disk I/O
+- UI Layout
+
+### Faz 3: Ileri Duzey Ozellikler ✅
+- Process tree view
+- Process search/filter
+- Config dosyasi
+- Tema destegi
+- Help ekrani
+- Command-line argumanlar
+- GPU monitoring
+- Docker monitoring
+
+### Faz 4: Son Rotuslar ✅
+- Status bar
+- F-key support
+- AMD GPU support
+
+</details>
+
+---
+
+*Son guncelleme: Faz 5 eklendi - Kontekst-Duyarli Process Listesi*
