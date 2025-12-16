@@ -579,7 +579,7 @@ func main() {
 				for _, gp := range visibleGPUProcs {
 					rows = append(rows, []string{
 						strconv.Itoa(int(gp.PID)),
-						truncateString(getProcessUser(gp.PID), 8),
+						truncateString(getProcessUser(gp.PID), 11),
 						fmt.Sprintf("%.0f%%", gp.GPUPercent),
 						formatBytes(gp.GPUMemory),
 						gp.Type,
@@ -704,7 +704,7 @@ func main() {
 				}
 				rows = append(rows, []string{
 					strconv.Itoa(int(p.PID)),
-					truncateString(p.User, 8),
+					truncateString(p.User, 11),
 					fmt.Sprintf("%.1f", p.CPU),
 					fmt.Sprintf("%.1f", p.Memory),
 					p.State,
