@@ -195,6 +195,7 @@ func main() {
 	// Search/filter options
 	searchMode := false
 	searchQuery := ""
+	showHelp := false
 
 	// Cache for processes
 	var cachedProcesses []Process
@@ -384,6 +385,11 @@ func main() {
 
 		grid.SetRect(0, 0, termWidth, termHeight)
 		ui.Render(grid)
+
+		// Render help overlay if active
+		if showHelp {
+			renderHelp(termWidth, termHeight)
+		}
 	}
 
 	render()
@@ -395,6 +401,13 @@ func main() {
 	for {
 		select {
 		case e := <-uiEvents:
+			// Handle help mode - any key closes help
+			if showHelp {
+				showHelp = false
+				render()
+				continue
+			}
+
 			// Handle search mode input
 			if searchMode {
 				switch e.ID {
@@ -435,6 +448,9 @@ func main() {
 					searchQuery = ""
 					render()
 				}
+			case "?", "h":
+				showHelp = true
+				render()
 			case "<Resize>":
 				payload := e.Payload.(ui.Resize)
 				grid.SetRect(0, 0, payload.Width, payload.Height)
@@ -747,6 +763,60 @@ func getProcesses() []Process {
 	}
 
 	return processes
+}
+
+// renderHelp displays a help overlay with keyboard shortcuts
+func renderHelp(termWidth, termHeight int) {
+	helpText := ` Konrul - Help
+
+ Navigation:
+   ↑/k        Scroll up
+   ↓/j        Scroll down
+   Home       Jump to top
+   End        Jump to bottom
+
+ Process Management:
+   K/Delete   Kill selected process
+
+ Sorting:
+   c          Sort by CPU usage
+   m          Sort by Memory usage
+   p          Sort by PID
+   n          Sort by Name
+   r          Reverse sort order
+
+ Views:
+   t          Toggle tree view
+   /          Search/filter processes
+   Esc        Clear search filter
+
+ Other:
+   ?/h        Show this help
+   q/Ctrl+C   Quit
+
+ Press any key to close this help`
+
+	// Create help paragraph
+	helpPara := widgets.NewParagraph()
+	helpPara.Title = " Help "
+	helpPara.Text = helpText
+	helpPara.BorderStyle.Fg = ui.ColorYellow
+	helpPara.TitleStyle.Fg = ui.ColorYellow
+
+	// Calculate centered position
+	helpWidth := 45
+	helpHeight := 32
+	x := (termWidth - helpWidth) / 2
+	y := (termHeight - helpHeight) / 2
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+
+	helpPara.SetRect(x, y, x+helpWidth, y+helpHeight)
+	ui.Render(helpPara)
 }
 
 // filterProcesses filters processes by search query (case-insensitive)
