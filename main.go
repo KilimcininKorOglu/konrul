@@ -176,7 +176,10 @@ func main() {
 	}
 
 	// Load config file
-	config := LoadConfig()
+	config := LoadConfig(configFile)
+
+	// Create default config file if it doesn't exist
+	CreateDefaultConfigFile()
 
 	// Command-line flags override config file
 	if refreshInterval == 0 {
@@ -1036,7 +1039,7 @@ func main() {
 				render()
 			case "T":
 				// Cycle through themes
-				NextTheme()
+				themeName := NextTheme()
 				theme = GetCurrentTheme()
 				// Update widget colors
 				cpuGauge.BarColor = theme.CPUColor
@@ -1055,6 +1058,8 @@ func main() {
 				cpuCores.BorderStyle.Fg = theme.BorderColor
 				cpuCores.BarColors = theme.BarColors
 				cpuCores.LabelStyles = []ui.Style{ui.NewStyle(theme.LabelColor)}
+				config.Theme = themeName
+				go SaveConfig(config)
 				render()
 			case "d":
 				// Cycle through view modes: Normal → GPU → Docker → Normal

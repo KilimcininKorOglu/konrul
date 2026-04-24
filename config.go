@@ -52,11 +52,15 @@ func getConfigPath() string {
 	return filepath.Join(configDir, "konrul", "config.yaml")
 }
 
-// LoadConfig loads configuration from file or returns defaults
-func LoadConfig() Config {
+// LoadConfig loads configuration from file or returns defaults.
+// If customPath is non-empty, it is used instead of the default path.
+func LoadConfig(customPath string) Config {
 	config := DefaultConfig()
 
-	configPath := getConfigPath()
+	configPath := customPath
+	if configPath == "" {
+		configPath = getConfigPath()
+	}
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		// Config file doesn't exist, use defaults
